@@ -3,7 +3,7 @@
 Read this first in every session. Update it before every commit.
 
 Current stage: **A** (write code, unit tests only)
-Next: **A0**
+Next: **A1**
 
 ## Chunks (one chat per chunk; `/build` does the first unfinished one, then stops)
 Sonnet: well-specified, self-contained work. Opus: work that has to hold many earlier
@@ -23,7 +23,7 @@ modules in mind at once. Use the newest model of that tier in the picker.
 Between chunks: new chat, `/check`, then `/build`.
 
 ## Stage A
-- [ ] A0 Scaffold
+- [x] A0 Scaffold
 - [ ] A1 Core: models, parsers, KoSIT client, rules
 - [ ] A2 Data: synthetic generator, AP policy, SKR03 subset, migrations
 - [ ] A3 Extraction: text, OCR, LLM extraction with evidence check
@@ -48,6 +48,11 @@ Between chunks: new chat, `/check`, then `/build`.
 
 ## Decision log
 One line each: date, decision, reason.
+
+- 2026-10-31: `cli.py` has one subcommand (`config`) in A0; later phases add theirs when the code exists. Reason: no stubs, but `--help` must list something real.
+- 2026-10-31: `fetch_data.py` takes the latest release of each KoSIT repo and the master commit of the ZUGFeRD corpus, and records the version in `DATA_SOURCES.md`. Reason: the SPEC names no fixed versions.
+- 2026-10-31: setuptools as build backend, no extra dependency. CPU torch was installed in the venv before the rest to avoid CUDA wheels; `pyproject.toml` does not pin torch (comes with sentence-transformers).
+- 2026-10-31: `tesseract` binary is not installed in this WSL; OCR tests in A3 must skip when it is missing.
 
 ## UNVERIFIED
 Things written in Stage A that could not be run there. Stage B checks each one and

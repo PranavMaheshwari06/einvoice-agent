@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "einvoice"
+version = "0.1.0"
+description = "Accounts-payable pipeline for German e-invoices"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic~=2.14.2",
+    "pydantic-settings~=2.16.2",
+    "lxml~=6.1.3",
+    "pypdf~=6.21.4",
+    "pdfplumber~=0.11.10",
+    "pypdfium2~=5.14.0",
+    "pytesseract~=0.3.13",
+    "Pillow~=13.0.0",
+    "reportlab~=5.1.0",
+    "drafthorse~=2025.2.0",
+    "faker~=40.44.0",
+    "httpx~=0.28.1",
+    "psycopg[binary]~=3.3.6",
+    "pgvector~=0.5.1",
+    "numpy~=2.5.4",
+    "scikit-learn~=1.9.1",
+    "mlflow~=3.17.2",
+    "sentence-transformers~=6.2.0",
+    "matplotlib~=3.11.2",
+]
+
+[project.optional-dependencies]
+agent = [
+    "langgraph~=1.2.19",
+    "langchain-core~=1.7.3",
+    "langchain-openai~=1.7.3",
+    "langchain-anthropic~=1.7.7",
+    "mcp~=1.30.0",
+    "langchain-mcp-adapters~=0.3.2",
+]
+api = [
+    "fastapi~=0.162.0",
+    "uvicorn~=0.54.0",
+    "prometheus-client~=0.26.0",
+    "python-multipart~=0.0.32",
+]
+ui = ["streamlit~=1.66.1"]
+dev = ["pytest~=9.2.0", "ruff~=0.17.3"]
+
+[project.scripts]
+einvoice = "einvoice.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: needs Postgres, the KoSIT validator, a real LLM or the network"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

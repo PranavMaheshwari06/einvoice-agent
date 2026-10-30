@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.env
+data/raw/
+data/synth/
+mlruns/
+mlartifacts/
+*.pkl
+*.joblib
+*.onnx
+*.pt
+*.safetensors
+terraform.tfstate*
+.terraform/
