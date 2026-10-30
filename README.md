@@ -23,13 +23,22 @@ python3 -m venv .venv
 code .
 ```
 
-In VS Code, open Copilot Chat, switch to **Agent** mode, and type `/build`.
-If prompt files are switched off, open `.github/prompts/build.prompt.md` and paste
-its text (everything below the `---` block) into the chat.
+The build runs in 8 chunks (table in `STATE.md`), one chat each. For every chunk:
 
-Approve the terminal commands Copilot asks to run (pip, pytest, ruff, git commit).
-If a chat gets long or ends, open a new one and type `/build` again; it continues from
-`STATE.md`. When Copilot says "Stage A done", run `git push`.
+1. New Copilot Chat, **Agent** mode, pick the model `STATE.md` names for the next chunk
+   (Sonnet or Opus, newest of that tier).
+2. Type `/check`. It must end with `Verdict: READY` (skip it before chunk 1).
+3. Type `/build`. Approve the terminal commands (pip, pytest, ruff, git commit). It builds
+   that chunk, commits per phase, prints a summary and stops.
+4. Read the summary: `ruff` pass, pytest passed, new UNVERIFIED lines. Then `git push`
+   (the repo is the backup) and go back to step 1.
+
+If prompt files are switched off, open `.github/prompts/build.prompt.md` or
+`check.prompt.md` and paste the text below the `---` block into the chat.
+When Copilot says "Stage A done", run `git push` and move to Stage B.
+
+If you change a file on the personal machine (like this one), run `git pull` in the WSL
+terminal before the next chunk. Reloading the VS Code window does not fetch anything.
 
 ### Stage B (your own machine, Claude Code)
 

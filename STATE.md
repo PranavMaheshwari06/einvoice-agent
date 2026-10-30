@@ -5,6 +5,23 @@ Read this first in every session. Update it before every commit.
 Current stage: **A** (write code, unit tests only)
 Next: **A0**
 
+## Chunks (one chat per chunk; `/build` does the first unfinished one, then stops)
+Sonnet: well-specified, self-contained work. Opus: work that has to hold many earlier
+modules in mind at once. Use the newest model of that tier in the picker.
+
+| Chunk | Phases | Model | Why |
+|---|---|---|---|
+| 1 | A0 | Sonnet | scaffold, config, fetch script |
+| 2 | A1 | Opus | models, parsers, KoSIT client and rules; everything later builds on it |
+| 3 | A2 | Sonnet | synthetic data and SQL, follows A1 models |
+| 4 | A3 | Sonnet | extraction against replay fixtures |
+| 5 | A4 | Opus | training, conversion and evaluation touch A1-A3 |
+| 6 | A5 | Opus | agent graph, tools, RAG and guardrails use most of the package |
+| 7 | A6, A7 | Sonnet | API/UI and monitoring on top of finished modules |
+| 8 | A8, A9 | Sonnet | infra files and handoff docs |
+
+Between chunks: new chat, `/check`, then `/build`.
+
 ## Stage A
 - [ ] A0 Scaffold
 - [ ] A1 Core: models, parsers, KoSIT client, rules
