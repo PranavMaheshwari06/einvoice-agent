@@ -3,7 +3,7 @@
 Read this first in every session. Update it before every commit.
 
 Current stage: **A** (write code, unit tests only)
-Next: **A3**
+Next: **A4**
 
 ## Chunks (one chat per chunk; `/build` does the first unfinished one, then stops)
 Sonnet: well-specified, self-contained work. Opus: work that has to hold many earlier
@@ -26,7 +26,7 @@ Between chunks: new chat, `/check`, then `/build`.
 - [x] A0 Scaffold
 - [x] A1 Core: models, parsers, KoSIT client, rules
 - [x] A2 Data: synthetic generator, AP policy, SKR03 subset, migrations
-- [ ] A3 Extraction: text, OCR, LLM extraction with evidence check
+- [x] A3 Extraction: text, OCR, LLM extraction with evidence check
 - [ ] A4 Models + eval: GL coder, convert, risk-coverage evaluation
 - [ ] A5 Agent: MCP tools, RAG, LangGraph graph, guardrails, 30 cases
 - [ ] A6 API + UI
@@ -70,6 +70,10 @@ One line each: date, decision, reason.
 - 2026-10-31: The same seed gives identical files except ZUGFeRD PDFs: drafthorse writes the current time into them. The test compares the embedded XML for those.
 - 2026-10-31: Vendor split 24 train / 6 validation / 10 test; an unknown-vendor invoice has its own one-off vendor and gets a random split.
 - 2026-10-31: SKR03 numbers and names in `skr03_subset.csv` are from memory (generic names), not copied from an official table.
+- 2026-10-31: `extract_invoice(pages, format, complete)` takes a plain `complete(prompt) -> str` instead of a chat model, since `llm.py` only arrives in A5; A5 wraps the chat model in a lambda. It returns `(Invoice, reasons)`; the reason `EVIDENCE_NOT_FOUND` is for the caller to add to the decision, the engine itself reports `LOW_EXTRACTION_CONFIDENCE` for the zeroed field.
+- 2026-10-31: `ExtractedInvoice` is typed (`Extracted[Decimal]`, `Extracted[date]`), so a bad amount or date fails validation and triggers the one retry. It carries what the rules need (addresses, line price, line net sum, VAT breakdown, amount due). Line VAT category is set to `S` only for a positive rate; a 0 % rate leaves it empty.
+- 2026-10-31: Replay fixtures `tests/fixtures/replay/extract_*.json` hold `{pdf, content}`, `content` being the JSON object the model would return. The third PDF is the synthetic `inv_00001.pdf` (copied to `tests/fixtures/synth/`), not a third corpus file: the corpus has no other plain-layout PDF in the fixtures and the unstructured Hetzner PDF names a person.
+- 2026-10-31: Quote check compares with whitespace collapsed (line breaks in the PDF text layer would otherwise reject correct quotes); it is case- and character-exact otherwise.
 
 ## UNVERIFIED
 Things written in Stage A that could not be run there. Stage B checks each one and
@@ -85,6 +89,8 @@ deletes the line when it is confirmed or fixed.
 - `synth/generate.py`: ZUGFeRD PDFs are reportlab PDFs with `drafthorse.pdf.attach_xml`, not PDF/A-3; pypdf reads them, a strict PDF/A or Mustang check may reject them.
 - `synth/render.py`: no tesseract here, so the OCR legibility of the generated scans (rotation up to 1.5 degrees, noise) is unchecked; A3 OCR tests skip without it.
 - `data/rules/skr03_subset.csv`: account numbers and names not checked against an official SKR03 list.
+- `extraction/ocr.py`: `pytesseract.image_to_string(lang="deu")` and pypdfium2 `page.render(scale=300/72).to_pil()` never ran (no tesseract binary, no `deu` language data); both tests in `test_ocr.py` skip here.
+- `extraction/prompts/extract_de.txt`: never sent to a real model; whether it yields valid JSON with exact quotes (and no code fences) is unknown. Replay fixtures are hand-written, not recorded.
 
 ## Blockers
 Anything that stopped progress twice in a row, with what was tried.

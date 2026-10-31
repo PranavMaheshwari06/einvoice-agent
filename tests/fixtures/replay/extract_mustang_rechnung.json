@@ -1,0 +1,62 @@
+{
+  "pdf": "corpus/MustangGnuaccountingBeispielRE-20201121_508.pdf",
+  "content": {
+    "number": {"value": "RE-20201121/508", "page": 1, "quote": "Invoice # RE-20201121/508", "confidence": 0.98},
+    "issue_date": {"value": "2020-11-21", "page": 1, "quote": "issued at 2020-11-21", "confidence": 0.97},
+    "due_date": {"value": "2020-12-12", "page": 1, "quote": "Please remit until 2020-12-12", "confidence": 0.95},
+    "delivery_date": {"value": "2020-11-10", "page": 1, "quote": "Date of delivery 2020-11-10", "confidence": 0.95},
+    "seller_name": {"value": "Bei Spiel GmbH", "page": 1, "quote": "Bei Spiel GmbH", "confidence": 0.95},
+    "seller_vat_id": {"value": "DE136695976", "page": 1, "quote": "VAT-ID: DE136695976", "confidence": 0.98},
+    "seller_address": {
+      "street": {"value": "Ecke 12", "page": 1, "quote": "Ecke 12", "confidence": 0.9},
+      "postcode": {"value": "12345", "page": 1, "quote": "12345 Stadthausen", "confidence": 0.9},
+      "city": {"value": "Stadthausen", "page": 1, "quote": "12345 Stadthausen", "confidence": 0.9}
+    },
+    "buyer_name": {"value": "Theodor Est", "page": 1, "quote": "Theodor Est", "confidence": 0.7},
+    "buyer_address": {
+      "street": {"value": "Bahnstr. 42", "page": 1, "quote": "Bahnstr. 42", "confidence": 0.8},
+      "postcode": {"value": "88802", "page": 1, "quote": "88802Spielkreis", "confidence": 0.7},
+      "city": {"value": "Spielkreis", "page": 1, "quote": "88802Spielkreis", "confidence": 0.7}
+    },
+    "iban": {"value": "DE88200800000970375700", "page": 1, "quote": "IBAN DE88200800000970375700", "confidence": 0.98},
+    "tax_exclusive_total": {"value": "496.00", "page": 1, "quote": "Net total: 496.00 €", "confidence": 0.97},
+    "vat_total": {"value": "75.04", "page": 1, "quote": "VAT total: 75.04 €", "confidence": 0.97},
+    "gross_total": {"value": "571.04", "page": 1, "quote": "Due payable: 571.04 €", "confidence": 0.7},
+    "amount_due": {"value": "571.04", "page": 1, "quote": "Due payable: 571.04 €", "confidence": 0.97},
+    "lines": [
+      {
+        "item_name": {"value": "Design (hours)", "page": 1, "quote": "Design (hours)", "confidence": 0.95},
+        "quantity": {"value": "1.00", "page": 1, "quote": "1.00 Design", "confidence": 0.95},
+        "unit_price": {"value": "160.00", "page": 1, "quote": "7% 160.00 €", "confidence": 0.95},
+        "net_amount": {"value": "160.00", "page": 1, "quote": "160.00 € 160.00 €", "confidence": 0.95},
+        "vat_rate": {"value": "7", "page": 1, "quote": "7% 160.00", "confidence": 0.95}
+      },
+      {
+        "item_name": {"value": "Ballons", "page": 1, "quote": "Ballons", "confidence": 0.95},
+        "quantity": {"value": "400.00", "page": 1, "quote": "400.00 Ballons", "confidence": 0.95},
+        "unit_price": {"value": "0.79", "page": 1, "quote": "19% 0.79 €", "confidence": 0.95},
+        "net_amount": {"value": "316.00", "page": 1, "quote": "0.79 € 316.00 €", "confidence": 0.95},
+        "vat_rate": {"value": "19", "page": 1, "quote": "19% 0.79", "confidence": 0.95}
+      },
+      {
+        "item_name": {"value": "Hot air", "page": 1, "quote": "Hot air", "confidence": 0.85},
+        "quantity": {"value": "800.00", "page": 1, "quote": "800.00 Hot air", "confidence": 0.95},
+        "unit_price": {"value": "0.025", "page": 1, "quote": "19% 0.025 €", "confidence": 0.95},
+        "net_amount": {"value": "20.00", "page": 1, "quote": "0.025 € 20.00 €", "confidence": 0.95},
+        "vat_rate": {"value": "19", "page": 1, "quote": "19% 0.025", "confidence": 0.95}
+      }
+    ],
+    "vat_breakdown": [
+      {
+        "rate": {"value": "7", "page": 1, "quote": "7% 160.00 € 11.20 €", "confidence": 0.95},
+        "taxable_amount": {"value": "160.00", "page": 1, "quote": "7% 160.00 €", "confidence": 0.95},
+        "tax_amount": {"value": "11.20", "page": 1, "quote": "160.00 € 11.20 €", "confidence": 0.95}
+      },
+      {
+        "rate": {"value": "19", "page": 1, "quote": "19% 336.00 € 63.84 €", "confidence": 0.95},
+        "taxable_amount": {"value": "336.00", "page": 1, "quote": "19% 336.00 €", "confidence": 0.95},
+        "tax_amount": {"value": "63.84", "page": 1, "quote": "336.00 € 63.84 €", "confidence": 0.95}
+      }
+    ]
+  }
+}

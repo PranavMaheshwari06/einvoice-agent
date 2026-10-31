@@ -1,0 +1,25 @@
+You read the text of a German invoice and return its data as JSON. Answer with the JSON object only: no
+explanation, no code fence.
+
+The text is split into pages and marked [Seite 1], [Seite 2], and so on. It may come from OCR and
+contain recognition errors; copy it as it is, do not correct it.
+
+Rules:
+- Every field is an object with "value", "page", "quote" and "confidence".
+- "quote" is the exact characters from the page text that the value comes from, copied without
+  changes (original spelling, original number format such as 1.234,56). Keep it short, but long
+  enough to be found on that page. "page" is the page number where the quote stands.
+- "value" is normalised: dates as YYYY-MM-DD, amounts and quantities as plain decimals with a dot
+  (1234.56), VAT rates as percent numbers (19 or 7), IBAN and VAT id without spaces.
+- "confidence" is your own estimate between 0 and 1 that the value is correct.
+- If the invoice does not state a field, leave it out or use null. Never guess or calculate a value
+  that is not written in the text.
+- "lines" holds one entry per invoice position, "vat_breakdown" one entry per VAT rate.
+- Amounts: "line_net_total" is the sum of the line amounts, "tax_exclusive_total" the total without
+  VAT, "gross_total" the total with VAT, "amount_due" the amount to pay.
+
+JSON schema of the answer:
+{schema}
+
+Invoice text:
+{pages}

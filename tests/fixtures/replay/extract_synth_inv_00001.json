@@ -1,0 +1,50 @@
+{
+  "pdf": "synth/inv_00001.pdf",
+  "content": {
+    "number": {"value": "2975-00001", "page": 1, "quote": "Rechnung Nr.: 2975-00001", "confidence": 0.98},
+    "issue_date": {"value": "2025-01-02", "page": 1, "quote": "Datum: 02.01.25", "confidence": 0.95},
+    "due_date": {"value": "2025-02-01", "page": 1, "quote": "Zahlbar bis 01.02.25", "confidence": 0.95},
+    "delivery_date": {"value": "2024-12-21", "page": 1, "quote": "Leistungsdatum: 21.12.24", "confidence": 0.95},
+    "po_number": {"value": "PO-91729", "page": 1, "quote": "Ihre Bestellung: PO-91729", "confidence": 0.97},
+    "seller_name": {"value": "Siering Wirth OHG mbH", "page": 1, "quote": "Siering Wirth OHG mbH", "confidence": 0.97},
+    "seller_vat_id": {"value": "DE363252975", "page": 1, "quote": "Umsatzsteuer-ID DE363252975", "confidence": 0.98},
+    "seller_address": {
+      "street": {"value": "Mansstraße 89", "page": 1, "quote": "Mansstraße 89", "confidence": 0.95},
+      "postcode": {"value": "06610", "page": 1, "quote": "06610 Cuxhaven", "confidence": 0.95},
+      "city": {"value": "Cuxhaven", "page": 1, "quote": "06610 Cuxhaven", "confidence": 0.95}
+    },
+    "buyer_name": {"value": "Beispiel Einkauf GmbH", "page": 1, "quote": "Beispiel Einkauf GmbH", "confidence": 0.95},
+    "buyer_address": {
+      "street": {"value": "Musterstraße 1", "page": 1, "quote": "Musterstraße 1", "confidence": 0.95},
+      "postcode": {"value": "10115", "page": 1, "quote": "10115 Berlin", "confidence": 0.95},
+      "city": {"value": "Berlin", "page": 1, "quote": "10115 Berlin", "confidence": 0.95}
+    },
+    "iban": {"value": "DE24127684228140763860", "page": 1, "quote": "IBAN: DE24127684228140763860", "confidence": 0.98},
+    "line_net_total": {"value": "118.48", "page": 1, "quote": "Summe netto: 118,48", "confidence": 0.96},
+    "tax_exclusive_total": {"value": "118.48", "page": 1, "quote": "Summe netto: 118,48", "confidence": 0.96},
+    "vat_total": {"value": "22.51", "page": 1, "quote": "Umsatzsteuer 19 %: 22,51", "confidence": 0.96},
+    "gross_total": {"value": "140.99", "page": 1, "quote": "Gesamtbetrag: 140,99", "confidence": 0.97},
+    "amount_due": {"value": "140.99", "page": 1, "quote": "Gesamtbetrag: 140,99", "confidence": 0.9},
+    "lines": [
+      {
+        "item_name": {"value": "Kopierpapier A4 500 Blatt", "page": 1, "quote": "Kopierpapier A4 500 Blatt", "confidence": 0.95},
+        "quantity": {"value": "8", "page": 1, "quote": "Blatt 8 6,98", "confidence": 0.9},
+        "unit_price": {"value": "6.98", "page": 1, "quote": "8 6,98", "confidence": 0.9},
+        "net_amount": {"value": "55.84", "page": 1, "quote": "6,98 55,84", "confidence": 0.9}
+      },
+      {
+        "item_name": {"value": "Kundengeschenk Präsentkorb", "page": 1, "quote": "Kundengeschenk Präsentkorb", "confidence": 0.95},
+        "quantity": {"value": "1", "page": 1, "quote": "Präsentkorb 1 62,64", "confidence": 0.9},
+        "unit_price": {"value": "62.64", "page": 1, "quote": "1 62,64", "confidence": 0.9},
+        "net_amount": {"value": "62.64", "page": 1, "quote": "62,64 62,64", "confidence": 0.9}
+      }
+    ],
+    "vat_breakdown": [
+      {
+        "rate": {"value": "19", "page": 1, "quote": "Nettobetrag 19 %", "confidence": 0.95},
+        "taxable_amount": {"value": "118.48", "page": 1, "quote": "Nettobetrag 19 %: 118,48", "confidence": 0.95},
+        "tax_amount": {"value": "22.51", "page": 1, "quote": "Umsatzsteuer 19 %: 22,51", "confidence": 0.95}
+      }
+    ]
+  }
+}

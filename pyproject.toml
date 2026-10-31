@@ -56,7 +56,7 @@ einvoice = "einvoice.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-einvoice = ["db/migrations/*.sql"]
+einvoice = ["db/migrations/*.sql", "extraction/prompts/*.txt"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
