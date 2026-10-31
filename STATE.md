@@ -3,7 +3,7 @@
 Read this first in every session. Update it before every commit.
 
 Current stage: **A** (write code, unit tests only)
-Next: **A2**
+Next: **A3**
 
 ## Chunks (one chat per chunk; `/build` does the first unfinished one, then stops)
 Sonnet: well-specified, self-contained work. Opus: work that has to hold many earlier
@@ -25,7 +25,7 @@ Between chunks: new chat, `/check`, then `/build`.
 ## Stage A
 - [x] A0 Scaffold
 - [x] A1 Core: models, parsers, KoSIT client, rules
-- [ ] A2 Data: synthetic generator, AP policy, SKR03 subset, migrations
+- [x] A2 Data: synthetic generator, AP policy, SKR03 subset, migrations
 - [ ] A3 Extraction: text, OCR, LLM extraction with evidence check
 - [ ] A4 Models + eval: GL coder, convert, risk-coverage evaluation
 - [ ] A5 Agent: MCP tools, RAG, LangGraph graph, guardrails, 30 cases
@@ -61,6 +61,15 @@ One line each: date, decision, reason.
 - 2026-10-31: Non-German seller VAT ids pass `INVALID_VAT_ID` with severity info (format only checked for DE).
 - 2026-10-31: Fixtures: 14 public files, including the 03.07a pair (the only public files with line-level allowances). The corpus `unstructured/` Hetzner PDF is not used: it names a private person (DSGVO). Plain-PDF and scan tests build their files with reportlab and Pillow.
 - 2026-10-31: No Java in this WSL, so the KoSIT report fixture is written by hand from `report.xsd` / `default-report.xsl`.
+- 2026-10-31: `db/` is the package `einvoice.db` (`db.py` plus `migrations/*.sql`), listed under `package-data` in `pyproject.toml`. `einvoice db migrate` applies the SQL; `einvoice db load` loads vendors, purchase orders and goods receipts from the seed output (B1 needs it, SPEC names no command).
+- 2026-10-31: `convert.py` exists since A2 with only `invoice_to_cii` (drafthorse), because the generator needs it; A4 adds the `convert` command and the KoSIT check. It refuses allowances and charges instead of dropping them. It writes placeholder contact and electronic address, since XRechnung requires them and the canonical `Invoice` has neither.
+- 2026-10-31: Generator is split into `synth/catalogue.py` (37 items, data), `synth/render.py` (UBL writer, 3 PDF layouts, scan) and `synth/generate.py`. Each is over 300 lines because `ruff format` puts one argument per line and the logic needs several steps; none has a second implementation or option behind it.
+- 2026-10-31: `einvoice seed` has `--count` (default 2000) because unit tests need a small set. Output: `vendors.json`, `purchase_orders.json` (lines carry their goods receipt or `null` for 2-way match), `gold.jsonl`, `invoices/`. Scans are PNG files.
+- 2026-10-31: Gold labels: the invoice `gl_account` is the account of its largest line; `reasons` hold only rule codes (no `KOSIT_REJECTED`, no `LOW_GL_CONFIDENCE`); for `vat_sum_off` the gold amounts are the correct ones, the document states the wrong VAT. `test_generate.py` runs the A1 rules engine over every structured file and requires reasons == gold reasons; the same check over all 2000 files of seed 1 agreed.
+- 2026-10-31: `missing_vat_id` and `missing_delivery_date` are only injected into invoices above 250 EUR, because the rules (correctly) do not require them for small amounts (§33 UStDV). The generator scales the first line up to get there.
+- 2026-10-31: The same seed gives identical files except ZUGFeRD PDFs: drafthorse writes the current time into them. The test compares the embedded XML for those.
+- 2026-10-31: Vendor split 24 train / 6 validation / 10 test; an unknown-vendor invoice has its own one-off vendor and gets a random split.
+- 2026-10-31: SKR03 numbers and names in `skr03_subset.csv` are from memory (generic names), not copied from an official table.
 
 ## UNVERIFIED
 Things written in Stage A that could not be run there. Stage B checks each one and
@@ -71,6 +80,11 @@ deletes the line when it is confirmed or fixed.
 - `tests/unit/validation/test_kosit.py::test_live_validator_accepts_a_testsuite_invoice` (integration) has never run.
 - `rules/legal.py`: `SMALL_AMOUNT_LIMIT` = 250 EUR (§33 UStDV) not checked against the primary source here.
 - `parsing/zugferd.py`: XRechnung PDFs attach `xrechnung.xml` (no fixture has one).
+- `db/migrations/001_init.sql`, `db/db.py`: never run against Postgres (pgvector extension, constraints, `migrate`, `load_master_data`); the unit test only checks the file text and a fake connection.
+- `convert.py`, `synth/render.py`: generated CII and UBL are XSD-valid (drafthorse validates CII) but never went through KoSIT; BR-DE rules and the placeholder contact are unconfirmed. Run the validator over `data/synth` in B1.
+- `synth/generate.py`: ZUGFeRD PDFs are reportlab PDFs with `drafthorse.pdf.attach_xml`, not PDF/A-3; pypdf reads them, a strict PDF/A or Mustang check may reject them.
+- `synth/render.py`: no tesseract here, so the OCR legibility of the generated scans (rotation up to 1.5 degrees, noise) is unchecked; A3 OCR tests skip without it.
+- `data/rules/skr03_subset.csv`: account numbers and names not checked against an official SKR03 list.
 
 ## Blockers
 Anything that stopped progress twice in a row, with what was tried.
