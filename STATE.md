@@ -75,6 +75,13 @@ One line each: date, decision, reason.
 - 2026-10-31: Replay fixtures `tests/fixtures/replay/extract_*.json` hold `{pdf, content}`, `content` being the JSON object the model would return. The third PDF is the synthetic `inv_00001.pdf` (copied to `tests/fixtures/synth/`), not a third corpus file: the corpus has no other plain-layout PDF in the fixtures and the unstructured Hetzner PDF names a person.
 - 2026-10-31: Quote check compares with whitespace collapsed (line breaks in the PDF text layer would otherwise reject correct quotes); it is case- and character-exact otherwise.
 
+## A4 findings so far (no A4 code written yet; checked in the venv here)
+- MLflow 3.17 refuses the file store `./mlruns` (maintenance mode). `sqlite:///mlflow.db` works: runs, `mlflow.sklearn.log_model(name=...)`, `register_model`, alias `champion` and `load_model("models:/gl-coder@champion")`; artifacts still land in `./mlruns`. Plan: default `mlflow_tracking_uri` to `sqlite:///mlflow.db`, add `mlflow.db` to `.gitignore`.
+- `CalibratedClassifierCV(FrozenEstimator(...))` fails when the calibration set lacks a class (IndexError) or is tiny. `CalibratedClassifierCV(pipeline, method="isotonic", cv=list(GroupKFold(5).split(X, y, sellers)))` works with string labels and rare classes. Plan: fit on train split with seller-grouped folds, pick champion on validation macro-F1, report test.
+- `intfloat/multilingual-e5-small` downloads (~470 MB to `~/.cache/huggingface`), 384-dim, about 300 texts/s on CPU. Unit tests must replace the encoder (download = network boundary).
+- Plan for the past-account feature: leave it out, since grouped test sellers never have history (log in decision log).
+- Plan for `einvoice eval`: test split; `--fixtures` = no KoSIT call (structured counted as accepted, stated in `metrics.json`); pdf/scan without a replay response are skipped and counted in `metrics.json`.
+
 ## UNVERIFIED
 Things written in Stage A that could not be run there. Stage B checks each one and
 deletes the line when it is confirmed or fixed.
