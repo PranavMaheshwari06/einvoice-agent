@@ -3,7 +3,7 @@
 Read this first in every session. Update it before every commit.
 
 Current stage: **A** (write code, unit tests only)
-Next: **A1**
+Next: **A2**
 
 ## Chunks (one chat per chunk; `/build` does the first unfinished one, then stops)
 Sonnet: well-specified, self-contained work. Opus: work that has to hold many earlier
@@ -24,7 +24,7 @@ Between chunks: new chat, `/check`, then `/build`.
 
 ## Stage A
 - [x] A0 Scaffold
-- [ ] A1 Core: models, parsers, KoSIT client, rules
+- [x] A1 Core: models, parsers, KoSIT client, rules
 - [ ] A2 Data: synthetic generator, AP policy, SKR03 subset, migrations
 - [ ] A3 Extraction: text, OCR, LLM extraction with evidence check
 - [ ] A4 Models + eval: GL coder, convert, risk-coverage evaluation
@@ -53,10 +53,24 @@ One line each: date, decision, reason.
 - 2026-10-31: `fetch_data.py` takes the latest release of each KoSIT repo and the master commit of the ZUGFeRD corpus, and records the version in `DATA_SOURCES.md`. Reason: the SPEC names no fixed versions.
 - 2026-10-31: setuptools as build backend, no extra dependency. CPU torch was installed in the venv before the rest to avoid CUDA wheels; `pyproject.toml` does not pin torch (comes with sentence-transformers).
 - 2026-10-31: `tesseract` binary is not installed in this WSL; OCR tests in A3 must skip when it is missing.
+- 2026-10-31: `Evidence` has a `bt` field next to `xpath`. `Invoice` also holds buyer address (BG-8), invoice period (BT-73/74), BT-107/108/113/114, and lines hold BT-132, BT-136/141 and BT-149. Reason: §14 needs the buyer address and period; arithmetic on real fixtures fails without allowances, charges and price base quantity.
+- 2026-10-31: Rule context types (`Vendor`, `PurchaseOrder`, `PoLine`, `PriorInvoice`, `RuleContext`) live in `models.py`. `PoLine.received_quantity` is the summed goods receipts; `None` means 2-way match only.
+- 2026-10-31: `engine.run` returns `(results, Decision)` so the caller can store every check. Missing GL probability counts as `LOW_GL_CONFIDENCE`.
+- 2026-10-31: `legal.py` holds only constants a rule uses (VAT rates, §33 UStDV limit). The §27 Abs. 38 transition dates go in when a rule needs them.
+- 2026-10-31: Price check is two-sided, code `PRICE_OUTSIDE_TOLERANCE`. VAT rate check: category S must be 19 or 7, other categories 0. A2's "wrong VAT rate" problem must use a rate outside these (e.g. 16), since rules cannot know the right rate for an item.
+- 2026-10-31: Non-German seller VAT ids pass `INVALID_VAT_ID` with severity info (format only checked for DE).
+- 2026-10-31: Fixtures: 14 public files, including the 03.07a pair (the only public files with line-level allowances). The corpus `unstructured/` Hetzner PDF is not used: it names a private person (DSGVO). Plain-PDF and scan tests build their files with reportlab and Pillow.
+- 2026-10-31: No Java in this WSL, so the KoSIT report fixture is written by hand from `report.xsd` / `default-report.xsl`.
 
 ## UNVERIFIED
 Things written in Stage A that could not be run there. Stage B checks each one and
 deletes the line when it is confirmed or fixed.
+
+- `validation/kosit.py`: the daemon takes a POST of the raw XML at `/` and answers 200 (accept) or 406 (reject) with the report as body.
+- `tests/fixtures/kosit/report_reject_br_de_15.xml`: hand-written to the report schema; replace with a real daemon report for 01.01a UBL without BuyerReference and re-run `test_kosit.py`.
+- `tests/unit/validation/test_kosit.py::test_live_validator_accepts_a_testsuite_invoice` (integration) has never run.
+- `rules/legal.py`: `SMALL_AMOUNT_LIMIT` = 250 EUR (§33 UStDV) not checked against the primary source here.
+- `parsing/zugferd.py`: XRechnung PDFs attach `xrechnung.xml` (no fixture has one).
 
 ## Blockers
 Anything that stopped progress twice in a row, with what was tried.

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rep:report xmlns:rep="http://www.xoev.de/de/validator/varl/1"
+            xmlns:s="http://www.xoev.de/de/validator/framework/1/scenarios"
+            xmlns:in="http://www.xoev.de/de/validator/framework/1/createreportinput"
+            valid="false" varlVersion="1.0.0">
+   <rep:engine>
+      <rep:name>KoSIT Validator 1.6.3</rep:name>
+   </rep:engine>
+   <rep:timestamp>2026-10-31T10:00:00.000+01:00</rep:timestamp>
+   <rep:documentIdentification>
+      <rep:documentHash>
+         <rep:hashAlgorithm>SHA-256</rep:hashAlgorithm>
+         <rep:hashValue>bm90LWEtcmVhbC1oYXNo</rep:hashValue>
+      </rep:documentHash>
+      <rep:documentReference>01.01a-INVOICE_ubl-without-buyer-reference.xml</rep:documentReference>
+   </rep:documentIdentification>
+   <rep:scenarioMatched>
+      <s:scenario>
+         <s:name>EN16931 XRechnung (UBL Invoice)</s:name>
+         <s:description>
+            <s:p>Validates UBL Invoice in version 2.1</s:p>
+         </s:description>
+      </s:scenario>
+      <rep:documentData>
+         <seller>[Seller name]</seller>
+         <id>123456XX</id>
+         <issueDate>2016-04-04</issueDate>
+      </rep:documentData>
+      <rep:validationStepResult id="val-xsd" valid="true">
+         <s:resource>
+            <s:name>XML Schema for UBL 2.1 Invoice</s:name>
+            <s:location>resources/ubl/2.1/xsd/maindoc/UBL-Invoice-2.1.xsd</s:location>
+         </s:resource>
+      </rep:validationStepResult>
+      <rep:validationStepResult id="val-sch.1" valid="true">
+         <s:resource>
+            <s:name>Schematron rules for EN16931 (UBL)</s:name>
+            <s:location>resources/ubl/2.1/xsl/EN16931-UBL-validation.xsl</s:location>
+         </s:resource>
+      </rep:validationStepResult>
+      <rep:validationStepResult id="val-sch.2" valid="false">
+         <s:resource>
+            <s:name>Schematron rules for Invoice - CIUS XRechnung (UBL)</s:name>
+            <s:location>resources/xrechnung/3.0.2/xsl/XRechnung-UBL-validation.xsl</s:location>
+         </s:resource>
+         <rep:message id="val-sch.2.1" level="error" xpathLocation="/Q{urn:oasis:names:specification:ubl:schema:xsd:Invoice-2}Invoice[1]" code="BR-DE-15">[BR-DE-15] Das Element "Buyer reference" (BT-10) muss übermittelt werden.</rep:message>
+      </rep:validationStepResult>
+   </rep:scenarioMatched>
+   <rep:assessment>
+      <rep:reject/>
+   </rep:assessment>
+</rep:report>
