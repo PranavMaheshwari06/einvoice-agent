@@ -1,0 +1,42 @@
+{
+ "case": "unknown_vendor",
+ "source": "hand-written",
+ "responses": [
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "get_invoice",
+     "args": {
+      "invoice_id": 1020
+     },
+     "id": "call_1"
+    }
+   ]
+  },
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "get_vendor_history",
+     "args": {
+      "vat_id": "DE100000099"
+     },
+     "id": "call_2"
+    },
+    {
+     "name": "search_rules",
+     "args": {
+      "query": "unbekannter Lieferant nicht in Stammdaten",
+      "k": 4
+     },
+     "id": "call_3"
+    }
+   ]
+  },
+  {
+   "content": "{\"action\": \"escalate\", \"explanation\": \"The seller DE100000099 is not in the vendor master data and vendors are not created from an invoice; a person must decide whether to onboard the vendor.\", \"citations\": [\"AP-vendor-master-data\"], \"vendor_email_de\": null}",
+   "tool_calls": []
+  }
+ ]
+}

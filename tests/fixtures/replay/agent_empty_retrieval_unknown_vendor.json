@@ -1,0 +1,35 @@
+{
+ "case": "empty_retrieval_unknown_vendor",
+ "source": "hand-written",
+ "responses": [
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "get_invoice",
+     "args": {
+      "invoice_id": 1032
+     },
+     "id": "call_1"
+    }
+   ]
+  },
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "search_rules",
+     "args": {
+      "query": "unbekannter Lieferant",
+      "k": 4
+     },
+     "id": "call_2"
+    }
+   ]
+  },
+  {
+   "content": "{\"action\": \"escalate\", \"explanation\": \"The vendor is unknown.\", \"citations\": [\"AP-vendor-master-data\"], \"vendor_email_de\": null}",
+   "tool_calls": []
+  }
+ ]
+}

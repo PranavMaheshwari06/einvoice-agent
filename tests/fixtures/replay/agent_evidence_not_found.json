@@ -1,0 +1,35 @@
+{
+ "case": "evidence_not_found",
+ "source": "hand-written",
+ "responses": [
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "get_invoice",
+     "args": {
+      "invoice_id": 1026
+     },
+     "id": "call_1"
+    }
+   ]
+  },
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "search_rules",
+     "args": {
+      "query": "Belegstelle nicht gefunden Extraktion",
+      "k": 4
+     },
+     "id": "call_2"
+    }
+   ]
+  },
+  {
+   "content": "{\"action\": \"escalate\", \"explanation\": \"Some extracted values could not be found on the page they were read from; a person must check them against the PDF.\", \"citations\": [\"AP-automatic-booking\"], \"vendor_email_de\": null}",
+   "tool_calls": []
+  }
+ ]
+}

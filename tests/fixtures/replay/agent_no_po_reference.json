@@ -1,0 +1,35 @@
+{
+ "case": "no_po_reference",
+ "source": "hand-written",
+ "responses": [
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "get_invoice",
+     "args": {
+      "invoice_id": 1015
+     },
+     "id": "call_1"
+    }
+   ]
+  },
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "search_rules",
+     "args": {
+      "query": "Bestellnummer fehlt auf der Rechnung",
+      "k": 4
+     },
+     "id": "call_2"
+    }
+   ]
+  },
+  {
+   "content": "{\"action\": \"request_correction\", \"explanation\": \"The invoice names no purchase order, which the policy requires for every invoice.\", \"citations\": [\"AP-purchase-order-matching\"], \"vendor_email_de\": \"Sehr geehrte Damen und Herren,\\n\\nzu Ihrer Rechnung RE-2026-0412 vom 14.09.2026 bitten wir um eine korrigierte Rechnung: Bitte geben Sie unsere Bestellnummer an.\\n\\nMit freundlichen Grüßen\\nKreditorenbuchhaltung\"}",
+   "tool_calls": []
+  }
+ ]
+}

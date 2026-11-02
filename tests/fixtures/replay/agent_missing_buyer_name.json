@@ -1,0 +1,35 @@
+{
+ "case": "missing_buyer_name",
+ "source": "hand-written",
+ "responses": [
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "get_invoice",
+     "args": {
+      "invoice_id": 1005
+     },
+     "id": "call_1"
+    }
+   ]
+  },
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "search_rules",
+     "args": {
+      "query": "Name des Leistungsempfängers fehlt",
+      "k": 4
+     },
+     "id": "call_2"
+    }
+   ]
+  },
+  {
+   "content": "{\"action\": \"request_correction\", \"explanation\": \"The invoice does not name the recipient, which § 14 Abs. 4 UStG requires.\", \"citations\": [\"UStG-14-4\"], \"vendor_email_de\": \"Sehr geehrte Damen und Herren,\\n\\nzu Ihrer Rechnung RE-2026-0412 vom 14.09.2026 bitten wir um eine korrigierte Rechnung: Bitte nennen Sie uns als Rechnungsempfänger mit vollständigem Namen.\\n\\nMit freundlichen Grüßen\\nKreditorenbuchhaltung\"}",
+   "tool_calls": []
+  }
+ ]
+}

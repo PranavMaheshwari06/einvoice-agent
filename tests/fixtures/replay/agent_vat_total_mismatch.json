@@ -1,0 +1,35 @@
+{
+ "case": "vat_total_mismatch",
+ "source": "hand-written",
+ "responses": [
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "get_invoice",
+     "args": {
+      "invoice_id": 1007
+     },
+     "id": "call_1"
+    }
+   ]
+  },
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "search_rules",
+     "args": {
+      "query": "Umsatzsteuerbetrag stimmt nicht mit Nettobetrag und Steuersatz überein",
+      "k": 4
+     },
+     "id": "call_2"
+    }
+   ]
+  },
+  {
+   "content": "{\"action\": \"request_correction\", \"explanation\": \"The stated VAT of 81.20 EUR does not equal 19 % of the net amount of 420.00 EUR (79.80 EUR); an invoice whose arithmetic fails is not booked.\", \"citations\": [\"AP-automatic-booking\"], \"vendor_email_de\": \"Sehr geehrte Damen und Herren,\\n\\nzu Ihrer Rechnung RE-2026-0412 vom 14.09.2026 bitten wir um eine korrigierte Rechnung: Der ausgewiesene Umsatzsteuerbetrag ist nicht korrekt berechnet.\\n\\nMit freundlichen Grüßen\\nKreditorenbuchhaltung\"}",
+   "tool_calls": []
+  }
+ ]
+}
