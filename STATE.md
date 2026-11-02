@@ -18,6 +18,8 @@ Brief:
 - Tick `A5 build` only. The provider probe, recording and the owner's review of recorded fixtures are the A5 live part and its STOP.
 Do not touch: Dockerfile, Compose, devcontainer, k8s, Terraform, CI files; A6 code (API, UI, persistence).
 
+Also unblocked since R0a (L1, laptop): R0b live on `pranav/r0b-live`, started from `pranav/r0-dev-environment`. Commands now run in the dev container (`make up`, then Reopen in Container, or `docker compose -f deploy/compose.yaml exec dev <cmd>`). First message: "Start L1 from STATE.md: close the R0b UNVERIFIED lines (Postgres migrations and loading, KoSIT over data/synth, real daemon report fixture), then stop."
+
 ## Sessions
 One session per row. The branch of a session starts from the tip of the previous one unless
 that one is already merged into `main`.
@@ -43,7 +45,7 @@ VS Code on the laptop.
 - [x] A1 Core (models, parsers, KoSIT client, rules): build; [ ] live (R0b)
 - [x] A2 Data (generator, AP policy, SKR03 subset, migrations): build; [ ] live (R0b)
 - [x] A3 Extraction (text, OCR, LLM extraction, evidence check): build; [ ] live (R0b, A5)
-- [ ] R0a Environment (dev container, Dockerfile, Compose, lockfile): build, live (laptop)
+- [x] R0a Environment (dev container, Dockerfile, Compose, lockfile): [x] build, [x] live (L1)
 - [ ] R0b Catch-up: [x] build (cloud, S1), [ ] live (laptop)
 - [ ] A4 Models + eval: [x] build (S2), [ ] live
 - [ ] A5 Agent: [ ] build (S3), [ ] live (provider probe, recording; STOP)
@@ -108,6 +110,10 @@ One line each: date, decision, reason.
 - 2026-11-02: `einvoice convert <file> --out <xml>` instead of `convert <invoice_id>` (SPEC 3.11). Reason: no stored invoices before A6b; switch to the id there.
 - 2026-11-02: `einvoice eval` reads replay responses from `<dir>/replay/<id>.json` (`{pdf, content}`, the A3 fixture format); PDFs and scans without one are skipped and counted. Thresholds: extraction 0.5 to 0.99 (6 values), GL 0 to 1 in steps of 0.01; the operating point is the highest validation coverage with zero wrong bookings, ties to the stricter thresholds; the rule-of-three bound is capped at 1.
 - 2026-11-02: `cli.main` sets `MLFLOW_DISABLE_TELEMETRY=true` unless set, and `tests/conftest.py` sets it. Reason: MLflow 3.17 sends usage telemetry over the network by default; the cloud proxy blocked it during a test run.
+- 2026-11-02: R0a: `requirements.lock` is a plain `pip freeze` written by `make lock` from a clean python:3.12-slim container, with torch installed first from the PyTorch CPU index and that index as the first line of the file. Reason: pip alone is enough because `pyproject.toml` already pins with `~=`; uv or pip-tools would be a new tool for a file that changes rarely.
+- 2026-11-02: R0a: one `Dockerfile` for dev and later api and ui, with the dev tools (pytest, ruff, make, git) in it; the user is uid 1000. Reason: tests run on the image that ships; a root user would leave root-owned `.pytest_cache` and `data/synth` in the mounted repo. The HF model cache is a named volume so a rebuild does not download e5 again.
+- 2026-11-02: R0a: all three services sit in the Compose profile `core`, ports are bound to 127.0.0.1, the Postgres image is `pgvector/pgvector:pg16`, and `devcontainer.json` names the three services in `runServices`. `make install` is removed (the lock replaces it); `up`, `down` and `lock` run on the host, the other targets inside the container.
+- 2026-11-02: R0a: the validator image pins jar v1.6.3 and configuration v2026-08-31 (XRechnung 3.0.2) as build ARGs, the same versions as `DATA_SOURCES.md`; Temurin 21 JRE because the configuration docs ask for Java 11 or later. `ADD --chmod=644` because a downloaded file is root-only otherwise and the daemon runs as a system user.
 - 2026-11-02: `models.value_of` and `ustg14.compact_vat_id` are shared helpers. Reason: the field-unwrap and VAT-id compaction had several copies; evaluation must compare an extracted "DE 123 456 789" with the compact master-data id.
 
 ## A4 findings (S2, cloud run on seed 1, 2000 invoices, hashing stub instead of e5, KoSIT skipped)
@@ -122,9 +128,9 @@ Things written without being able to run them. Tag `[open: <phase>]` names the p
 closes the line. Closing means running the real check, adding an integration test if none
 covers it, and deleting the line.
 
-- [open: R0b] `validation/kosit.py`: the daemon takes a POST of the raw XML at `/` and answers 200 (accept) or 406 (reject) with the report as body.
+- [open: R0b] `validation/kosit.py`: the daemon takes a POST of the raw XML at `/` and answers 200 (accept) or 406 (reject) with the report as body. R0a confirmed the 200 case with 01.01a UBL (the integration test passes); the 406 case is unchecked.
 - [open: R0b] `tests/fixtures/kosit/report_reject_br_de_15.xml`: hand-written to the report schema; replace with a real daemon report for 01.01a UBL without BuyerReference and re-run `test_kosit.py`.
-- [open: R0b] `tests/unit/validation/test_kosit.py::test_live_validator_accepts_a_testsuite_invoice` (integration) has never run.
+- [open: L1 owner] "Reopen in Container" in VS Code was not clicked; R0a checked `.devcontainer/devcontainer.json` with the devcontainer CLI (`up`, `exec`), which reads the same file.
 - [open: R0b] `rules/legal.py`: `SMALL_AMOUNT_LIMIT` = 250 EUR (§33 UStDV) not checked against the primary source here.
 - [open: R0b] `parsing/zugferd.py`: XRechnung PDFs attach `xrechnung.xml` (no fixture has one).
 - [open: R0b] `db/migrations/001_init.sql`, `db/db.py`: never run against Postgres (pgvector extension, constraints, `migrate`, `load_master_data`); the unit test only checks the file text and a fake connection.
@@ -132,7 +138,6 @@ covers it, and deleting the line.
 - [open: R0b] `synth/generate.py`: ZUGFeRD PDFs are reportlab PDFs with `drafthorse.pdf.attach_xml`, not PDF/A-3; pypdf reads them, a strict PDF/A or Mustang check may reject them.
 - [open: R0b] `synth/render.py`: the OCR legibility of the generated scans (rotation up to 1.5 degrees, noise) is unchecked; the A3 OCR tests skip without tesseract.
 - [open: R0b] `data/rules/skr03_subset.csv`: account numbers and names not checked against an official SKR03 list.
-- [open: R0b] `extraction/ocr.py`: `pytesseract.image_to_string(lang="deu")` and pypdfium2 `page.render(scale=300/72).to_pil()` never ran; both tests in `test_ocr.py` skip without the binary and the `deu` data.
 - [open: A5] `extraction/prompts/extract_de.txt`: never sent to a real model; whether it yields valid JSON with exact quotes (and no code fences) is unknown. Replay fixtures are hand-written, not recorded.
 - [open: A4] `ml/coding.py::E5Encoder`: `SentenceTransformer("intfloat/multilingual-e5-small").encode(..., normalize_embeddings=True)` never ran here (no HuggingFace access, sentence-transformers not installed); the "query: " prefix is from the model card. Run `einvoice train` with the real model.
 - [open: A4] `ml/train.py`: MLflow runs, registry and alias were checked only against a local SQLite store; the Compose MLflow service and `load_champion` from it are untested.
