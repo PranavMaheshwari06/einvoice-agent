@@ -2,49 +2,58 @@
 
 Read this first in every session. Update it before every commit.
 
-Current stage: **A** (write code, unit tests only)
-Next: **A4**
+Current phase: **R0b, cloud part** (session S1). A0 to A3 are built; A4 is not started.
+Rules: `CLAUDE.md`. Design: `docs/SPEC.md`. History: `docs/PHASE_LOG.md`.
 
-## Chunks (one chat per chunk; `/build` does the first unfinished one, then stops)
-Sonnet: well-specified, self-contained work. Opus: work that has to hold many earlier
-modules in mind at once. Use the newest model of that tier in the picker.
+## Next session
+Branch: `pranav/claude-code-setup` (base: `main`)
+Session: S1, step 2 (R0b cloud fixes), where: cloud, model: Sonnet
+First message: "Continue S1 step 2 from STATE.md: R0b cloud fixes, then print the S2 handoff."
+Do not touch: Dockerfile, Compose, devcontainer, k8s, Terraform, CI files; A4 code.
 
-| Chunk | Phases | Model | Why |
+## Sessions
+One session per row. The branch of a session starts from the tip of the previous one unless
+that one is already merged into `main`.
+
+| Session | Phase | Where / model | Branch |
 |---|---|---|---|
-| 1 | A0 | Sonnet | scaffold, config, fetch script |
-| 2 | A1 | Opus | models, parsers, KoSIT client and rules; everything later builds on it |
-| 3 | A2 | Sonnet | synthetic data and SQL, follows A1 models |
-| 4 | A3 | Sonnet | extraction against replay fixtures |
-| 5 | A4 | Opus | training, conversion and evaluation touch A1-A3 |
-| 6 | A5 | Opus | agent graph, tools, RAG and guardrails use most of the package |
-| 7 | A6, A7 | Sonnet | API/UI and monitoring on top of finished modules |
-| 8 | A8, A9 | Sonnet | infra files and handoff docs |
+| S1 | instruction files, R0b cloud fixes | cloud, Sonnet | `pranav/claude-code-setup` |
+| S2 | A4 build | cloud, Opus | `pranav/a4-models-eval` |
+| S3 | A5 build | cloud, Opus | `pranav/a5-agent` |
+| S4 | A6a UI design | cloud, Opus | `pranav/a6a-ui-design` |
+| S5 | A6b build, A7 build | cloud, Sonnet | `pranav/a6b-api-ui` |
+| L1 | R0a, then live passes R0b, A4, A5, A6b, A7 | laptop dev container, Sonnet then Opus | `pranav/r0-dev-environment`, then `pranav/<phase>-live` |
+| L2 | A8, A9 | laptop, Opus then Sonnet | `pranav/a8-infra`, `pranav/a9-release` |
 
-Between chunks: new chat, `/check`, then `/build`.
+If credits or time run out, resume from the "Next session" block; it works in the cloud or in
+VS Code on the laptop.
 
-## Stage A
-- [x] A0 Scaffold
-- [x] A1 Core: models, parsers, KoSIT client, rules
-- [x] A2 Data: synthetic generator, AP policy, SKR03 subset, migrations
-- [x] A3 Extraction: text, OCR, LLM extraction with evidence check
-- [ ] A4 Models + eval: GL coder, convert, risk-coverage evaluation
-- [ ] A5 Agent: MCP tools, RAG, LangGraph graph, guardrails, 30 cases
-- [ ] A6 API + UI
-- [ ] A7 Monitoring: metrics, drift, Grafana, retrain
-- [ ] A8 Infra: Docker, Compose, k8s, CI (dispatch-only), Terraform
-- [ ] A9 Handoff: README, design notes, UNVERIFIED list complete
+## Phases
+`build` = code and unit tests. `live` = checked against the real service. Cloud sessions tick
+`build` only.
 
-## Stage B
-- [ ] B0 Install, fetch, UNVERIFIED list, unit tests green
-- [ ] B1 Postgres + validator in Compose, integration tests green
-- [ ] B2 Real LLM, extraction eval, re-record replay fixtures (user reviews)
-- [ ] B3 Train on full data, promote champion
-- [ ] B4 Agent eval with real model (user tries 5 cases)
-- [ ] B5 Full Compose stack, UI walkthrough
-- [ ] B6 kind deploy, Prometheus, Grafana, drift CronJob
-- [ ] B7 CI on push/PR, green (user confirms before first GHCR push)
-- [ ] B8 Azure via Terraform (user sets budget first), demo, destroy
-- [ ] B9 README results, demo GIF, review agent files before going public
+- [x] A0 Scaffold: build, live
+- [x] A1 Core (models, parsers, KoSIT client, rules): build; [ ] live (R0b)
+- [x] A2 Data (generator, AP policy, SKR03 subset, migrations): build; [ ] live (R0b)
+- [x] A3 Extraction (text, OCR, LLM extraction, evidence check): build; [ ] live (R0b, A5)
+- [ ] R0a Environment (dev container, Dockerfile, Compose, lockfile): build, live (laptop)
+- [ ] R0b Catch-up: [ ] build (cloud, S1), [ ] live (laptop)
+- [ ] A4 Models + eval: [ ] build (S2), [ ] live
+- [ ] A5 Agent: [ ] build (S3), [ ] live (provider probe, recording; STOP)
+- [ ] A6a UI design: [ ] prototype (S4; STOP)
+- [ ] A6b API + UI: [ ] build (S5), [ ] live (STOP)
+- [ ] A7 Monitoring: [ ] build (S5), [ ] live
+- [ ] A8 Infra: build, live (laptop)
+- [ ] A9 Ship: CI, Azure, release gate, README (laptop; STOPs)
+
+## R0b cloud findings (from the audit before S1)
+1. `config.py` had no key or base-URL fields and an MLflow default the library refuses. Done in S1.
+2. `CLAUDE.md` pointed at Stage B while this file said Stage A. Done in S1.
+3. `engine._evidence_reasons` reports only the first low-confidence field. Open.
+4. `legal.py` lacks the §27 Abs. 38 UStG transition dates. Open; add when a rule needs them.
+5. Missing tests: `legal.py`, `db migrate` and `db load` handlers, replay-fixture content. Open.
+6. No end-to-end function and no DB persistence or `RuleContext` builder: `pipeline.py` in A4
+   (SPEC 3.13), persistence in A6b.
 
 ## Decision log
 One line each: date, decision, reason.
@@ -74,6 +83,15 @@ One line each: date, decision, reason.
 - 2026-10-31: `ExtractedInvoice` is typed (`Extracted[Decimal]`, `Extracted[date]`), so a bad amount or date fails validation and triggers the one retry. It carries what the rules need (addresses, line price, line net sum, VAT breakdown, amount due). Line VAT category is set to `S` only for a positive rate; a 0 % rate leaves it empty.
 - 2026-10-31: Replay fixtures `tests/fixtures/replay/extract_*.json` hold `{pdf, content}`, `content` being the JSON object the model would return. The third PDF is the synthetic `inv_00001.pdf` (copied to `tests/fixtures/synth/`), not a third corpus file: the corpus has no other plain-layout PDF in the fixtures and the unstructured Hetzner PDF names a person.
 - 2026-10-31: Quote check compares with whitespace collapsed (line breaks in the PDF text layer would otherwise reject correct quotes); it is case- and character-exact otherwise.
+- 2026-11-02: Stage A/B split dropped. Each phase has a `build` and a `live` part; the cloud does `build`, the laptop does `live`. Reason: the whole repo is on the owner's laptop now, and writing five phases without running them only moves the risk to the end.
+- 2026-11-02: Copilot files removed; `CLAUDE.md` holds the conventions and `.claude/commands/{build,check,verify}.md` replace the prompt files. Reason: the project is now built with Claude Code.
+- 2026-11-02: Branches are named `pranav/<phase>-<topic>`, one per session. Reason: the random cloud branch name says nothing about the work.
+- 2026-11-02: `Makefile` gets `check` only; `up`, `down`, `test-integration` and `lock` arrive with the Compose file in R0a. Reason: no target for a file that does not exist.
+- 2026-11-02: `Settings` holds `openai_api_key`, `openai_base_url` and `anthropic_api_key` (SecretStr); `mlflow_tracking_uri` defaults to `sqlite:///mlflow.db`. Reason: `.env` is read by pydantic-settings and not copied into `os.environ`, so `llm.py` must pass keys explicitly; MLflow 3.17 refuses the file store.
+- 2026-11-02: The "tesseract binary is not installed in this WSL" line above is obsolete: R0a puts tesseract with the `deu` data into the dev container image.
+- 2026-11-02: `pipeline.py` added to the SPEC (3.13). Reason: `evaluate.py` and the API need the same end-to-end function.
+- 2026-11-02: UI stack is open until A6a; `streamlit` stays in `pyproject.toml` until then. Reason: the owner wants a designed, more interactive UI and reviews a prototype first.
+- 2026-11-02: LLM for recording: try a free OpenAI-compatible provider (Gemini first) behind a probe in A5; ask the owner before using a paid provider. Reason: owner's request; replay fixtures keep tests independent of the provider.
 
 ## A4 findings so far (no A4 code written yet; checked in the venv here)
 - MLflow 3.17 refuses the file store `./mlruns` (maintenance mode). `sqlite:///mlflow.db` works: runs, `mlflow.sklearn.log_model(name=...)`, `register_model`, alias `champion` and `load_model("models:/gl-coder@champion")`; artifacts still land in `./mlruns`. Plan: default `mlflow_tracking_uri` to `sqlite:///mlflow.db`, add `mlflow.db` to `.gitignore`.
@@ -83,21 +101,24 @@ One line each: date, decision, reason.
 - Plan for `einvoice eval`: test split; `--fixtures` = no KoSIT call (structured counted as accepted, stated in `metrics.json`); pdf/scan without a replay response are skipped and counted in `metrics.json`.
 
 ## UNVERIFIED
-Things written in Stage A that could not be run there. Stage B checks each one and
-deletes the line when it is confirmed or fixed.
+Things written without being able to run them. Tag `[open: <phase>]` names the phase that
+closes the line. Closing means running the real check, adding an integration test if none
+covers it, and deleting the line.
 
-- `validation/kosit.py`: the daemon takes a POST of the raw XML at `/` and answers 200 (accept) or 406 (reject) with the report as body.
-- `tests/fixtures/kosit/report_reject_br_de_15.xml`: hand-written to the report schema; replace with a real daemon report for 01.01a UBL without BuyerReference and re-run `test_kosit.py`.
-- `tests/unit/validation/test_kosit.py::test_live_validator_accepts_a_testsuite_invoice` (integration) has never run.
-- `rules/legal.py`: `SMALL_AMOUNT_LIMIT` = 250 EUR (§33 UStDV) not checked against the primary source here.
-- `parsing/zugferd.py`: XRechnung PDFs attach `xrechnung.xml` (no fixture has one).
-- `db/migrations/001_init.sql`, `db/db.py`: never run against Postgres (pgvector extension, constraints, `migrate`, `load_master_data`); the unit test only checks the file text and a fake connection.
-- `convert.py`, `synth/render.py`: generated CII and UBL are XSD-valid (drafthorse validates CII) but never went through KoSIT; BR-DE rules and the placeholder contact are unconfirmed. Run the validator over `data/synth` in B1.
-- `synth/generate.py`: ZUGFeRD PDFs are reportlab PDFs with `drafthorse.pdf.attach_xml`, not PDF/A-3; pypdf reads them, a strict PDF/A or Mustang check may reject them.
-- `synth/render.py`: no tesseract here, so the OCR legibility of the generated scans (rotation up to 1.5 degrees, noise) is unchecked; A3 OCR tests skip without it.
-- `data/rules/skr03_subset.csv`: account numbers and names not checked against an official SKR03 list.
-- `extraction/ocr.py`: `pytesseract.image_to_string(lang="deu")` and pypdfium2 `page.render(scale=300/72).to_pil()` never ran (no tesseract binary, no `deu` language data); both tests in `test_ocr.py` skip here.
-- `extraction/prompts/extract_de.txt`: never sent to a real model; whether it yields valid JSON with exact quotes (and no code fences) is unknown. Replay fixtures are hand-written, not recorded.
+- [open: R0b] `validation/kosit.py`: the daemon takes a POST of the raw XML at `/` and answers 200 (accept) or 406 (reject) with the report as body.
+- [open: R0b] `tests/fixtures/kosit/report_reject_br_de_15.xml`: hand-written to the report schema; replace with a real daemon report for 01.01a UBL without BuyerReference and re-run `test_kosit.py`.
+- [open: R0b] `tests/unit/validation/test_kosit.py::test_live_validator_accepts_a_testsuite_invoice` (integration) has never run.
+- [open: R0b] `rules/legal.py`: `SMALL_AMOUNT_LIMIT` = 250 EUR (§33 UStDV) not checked against the primary source here.
+- [open: R0b] `parsing/zugferd.py`: XRechnung PDFs attach `xrechnung.xml` (no fixture has one).
+- [open: R0b] `db/migrations/001_init.sql`, `db/db.py`: never run against Postgres (pgvector extension, constraints, `migrate`, `load_master_data`); the unit test only checks the file text and a fake connection.
+- [open: R0b] `convert.py`, `synth/render.py`: generated CII and UBL are XSD-valid (drafthorse validates CII) but never went through KoSIT; BR-DE rules and the placeholder contact are unconfirmed. Run the validator over `data/synth`.
+- [open: R0b] `synth/generate.py`: ZUGFeRD PDFs are reportlab PDFs with `drafthorse.pdf.attach_xml`, not PDF/A-3; pypdf reads them, a strict PDF/A or Mustang check may reject them.
+- [open: R0b] `synth/render.py`: the OCR legibility of the generated scans (rotation up to 1.5 degrees, noise) is unchecked; the A3 OCR tests skip without tesseract.
+- [open: R0b] `data/rules/skr03_subset.csv`: account numbers and names not checked against an official SKR03 list.
+- [open: R0b] `extraction/ocr.py`: `pytesseract.image_to_string(lang="deu")` and pypdfium2 `page.render(scale=300/72).to_pil()` never ran; both tests in `test_ocr.py` skip without the binary and the `deu` data.
+- [open: A5] `extraction/prompts/extract_de.txt`: never sent to a real model; whether it yields valid JSON with exact quotes (and no code fences) is unknown. Replay fixtures are hand-written, not recorded.
 
 ## Blockers
 Anything that stopped progress twice in a row, with what was tried.
+
+None.

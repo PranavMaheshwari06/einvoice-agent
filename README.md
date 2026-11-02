@@ -2,52 +2,42 @@
 
 Checks incoming German e-invoices (XRechnung, ZUGFeRD, plain PDF, scans), books
 automatically only what the checks can prove, and sends the rest to a person with the
-reason. Design: [docs/SPEC.md](docs/SPEC.md). Progress: [STATE.md](STATE.md).
+reason. Design: [docs/SPEC.md](docs/SPEC.md). Progress: [STATE.md](STATE.md). Learning
+guide: [docs/GUIDE.md](docs/GUIDE.md).
 
 This README is a placeholder. It is replaced with the project README in phase A9.
 
 ## How this repo is built
 
-Stage A writes the code and runs the unit tests (no services, no keys). Stage B runs
-everything: database, validator, LLM, Docker, Kubernetes, CI, Azure.
+The repo is built with Claude Code, one session per step. `STATE.md` lists the sessions, the
+branch each one uses, and a "Next session" block with the first message to paste. Work can
+continue in a cloud session or in VS Code on the laptop; both read the same files.
 
-### Stage A (WSL, VS Code, GitHub Copilot)
+Each phase has two parts. `build` is code plus unit tests, which needs no services. `live`
+runs the phase against the real Postgres, KoSIT validator, LLM and Docker. A phase counts as
+finished only when both are done.
 
-```bash
-cd ~
-git clone https://github.com/PranavMaheshwari06/einvoice-agent.git
-cd einvoice-agent
-git config user.name "<your name>"
-git config user.email "<your personal email>"   # this repo only; keeps a work email out of the history
-python3 -m venv .venv
-code .
-```
-
-The build runs in 8 chunks (table in `STATE.md`), one chat each. For every chunk:
-
-1. New Copilot Chat, **Agent** mode, pick the model `STATE.md` names for the next chunk
-   (Sonnet or Opus, newest of that tier).
-2. Type `/check`. It must end with `Verdict: READY` (skip it before chunk 1).
-3. Type `/build`. Approve the terminal commands (pip, pytest, ruff, git commit). It builds
-   that chunk, commits per phase, prints a summary and stops.
-4. Read the summary: `ruff` pass, pytest passed, new UNVERIFIED lines. Then `git push`
-   (the repo is the backup) and go back to step 1.
-
-If prompt files are switched off, open `.github/prompts/build.prompt.md` or
-`check.prompt.md` and paste the text below the `---` block into the chat.
-When Copilot says "Stage A done", run `git push` and move to Stage B.
-
-If you change a file on the personal machine (like this one), run `git pull` in the WSL
-terminal before the next chunk. Reloading the VS Code window does not fetch anything.
-
-### Stage B (your own machine, Claude Code)
+### Quick start (until the dev container exists)
 
 ```bash
 git clone https://github.com/PranavMaheshwari06/einvoice-agent.git
 cd einvoice-agent
-claude
+python3 -m venv .venv && source .venv/bin/activate
+make install        # the sentence-transformers extra needs the PyTorch CPU wheels
+make fetch          # public test data into data/raw/
+make check          # ruff and the unit tests
+claude              # then /check, then /build
 ```
 
-Then: "Continue from STATE.md, Stage B, starting with B0." Install Docker Desktop, kind,
-kubectl and Ollama first if they are missing. An API key, if you use one, goes in `.env`
-(git-ignored), never in a committed file.
+On Windows, clone inside the WSL filesystem (`~/`), not under `/mnt/c`.
+
+### Claude Code commands
+
+- `/check`: read-only audit of the repo before a session.
+- `/build [phase]`: build the phase named in `STATE.md`, document it, commit, push, hand off.
+- `/verify`: close the first open UNVERIFIED line by running the real check.
+
+### Keys
+
+An API key, if you use one, goes in `.env` (git-ignored), never in a committed file.
+`.env.example` lists the variable names.
