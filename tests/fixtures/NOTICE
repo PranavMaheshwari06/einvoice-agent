@@ -23,3 +23,18 @@ kosit/report_reject_br_de_15.xml
   (report.xsd and default-report.xsl from validator-configuration-xrechnung v2026-08-31,
   Apache License 2.0). The message text is copied from the XRechnung schematron.
   It was not produced by a validator run; see UNVERIFIED in STATE.md.
+
+kosit/XRechnung-UBL-validation.xsl
+  Source: validator-configuration-xrechnung v2026-08-31 (XRechnung 3.0.2),
+  https://github.com/itplr-kosit/validator-configuration-xrechnung, file
+  resources/xrechnung/3.0.2/xsl/XRechnung-UBL-validation.xsl, copied unchanged.
+  Licence: Apache License 2.0, Copyright KoSIT (Koordinierungsstelle für IT-Standards)
+
+ustg/ustg_structure.xml
+  Written for this project in the element structure of the gesetze-im-internet.de XML
+  download (dokumente/norm/metadaten/enbez, textdaten/text/Content/P). The text is not the
+  law; it only gives the parser numbered paragraphs. See UNVERIFIED in STATE.md.
+
+replay/agent_*.json
+  Written by hand for this project (source "hand-written"), or recorded from the model named
+  in their "source" field: the messages a model sends for each case in evals/agent_cases.yaml.

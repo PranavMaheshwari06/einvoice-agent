@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dokumente builddate="20261031000000" doknr="BJNR000000000">
+  <norm builddate="20261031000000" doknr="BJNR000000001">
+    <metadaten>
+      <jurabk>UStG 1980</jurabk>
+      <enbez>§ 13b</enbez>
+      <titel format="parat">Strukturbeispiel</titel>
+    </metadaten>
+    <textdaten><text format="XML"><Content><P>(1) Absatz eines anderen Paragraphen.</P></Content></text></textdaten>
+  </norm>
+  <norm builddate="20261031000000" doknr="BJNR000000002">
+    <metadaten>
+      <jurabk>UStG 1980</jurabk>
+      <enbez>§ 14</enbez>
+      <titel format="parat">Strukturbeispiel</titel>
+    </metadaten>
+    <textdaten>
+      <text format="XML">
+        <Content>
+          <P>(1) Erster Absatz, Satz eins.
+            Satz zwei.</P>
+          <P>(2) Zweiter Absatz mit Aufzählung:<DL Type="arabic"><DT>1.</DT><DD Font="normal"><LA>erster Punkt;</LA></DD><DT>2.</DT><DD Font="normal"><LA>zweiter Punkt.</LA></DD></DL></P>
+          <P>(4) Vierter Absatz.</P>
+        </Content>
+      </text>
+    </textdaten>
+  </norm>
+</dokumente>

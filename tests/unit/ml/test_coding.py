@@ -95,13 +95,21 @@ def test_e5_encoder_prefixes_query_and_normalizes():
     assert encoder._model.calls == [(["query: Toner | Alpha GmbH"], True)]
 
 
+def test_e5_encoder_uses_the_passage_prefix_for_indexed_texts():
+    encoder = E5Encoder(prefix="passage: ")
+    encoder._model = RecordingModel()
+    encoder(["§ 14 Abs. 4 UStG"])
+    assert encoder._model.calls == [(["passage: § 14 Abs. 4 UStG"], True)]
+
+
 def test_e5_encoder_pickles_without_the_loaded_model():
-    encoder = E5Encoder()
+    encoder = E5Encoder(prefix="passage: ")
     encoder._model = RecordingModel()
     encoder(["Toner | Alpha GmbH"])
     restored = pickle.loads(pickle.dumps(encoder))
     assert restored._model is None
     assert restored._cache == {}
+    assert restored._prefix == "passage: "
 
 
 def test_e5_encoder_encodes_each_text_once_across_fold_copies():

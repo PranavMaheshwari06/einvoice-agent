@@ -36,6 +36,47 @@ def stub_encode(texts: list[str]) -> np.ndarray:
     return _HASHER.transform(texts).toarray()
 
 
+class Rows:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def fetchone(self):
+        return self.rows[0] if self.rows else None
+
+    def fetchall(self):
+        return self.rows
+
+
+class FakeDatabase:
+    """Stands in for a psycopg connection: answers a SELECT with the rows of the table it reads
+    and records every statement, so tests see what would reach Postgres."""
+
+    def __init__(self, tables: dict[str, list[tuple]] | None = None):
+        self.tables = tables or {}
+        self.sent: list[tuple[str, object]] = []
+        self.committed = False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_exc):
+        return False
+
+    def cursor(self):
+        return self
+
+    def execute(self, sql, params=None):
+        self.sent.append((sql, params))
+        rows = [rows for name, rows in self.tables.items() if f"FROM {name}" in sql]
+        return Rows(rows[0] if rows else [])
+
+    def executemany(self, sql, rows):
+        self.sent.extend((sql, row) for row in rows)
+
+    def commit(self):
+        self.committed = True
+
+
 def xml_value(value) -> Field:
     return Field(value=value, evidence=Evidence(source="xml"))
 

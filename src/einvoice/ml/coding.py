@@ -30,7 +30,9 @@ class E5Encoder:
     vectors are cached by text.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, prefix: str = "query: ") -> None:
+        # e5 expects "query: " for features and search queries, "passage: " for indexed texts.
+        self._prefix = prefix
         self._model = None
         self._cache: dict[str, np.ndarray] = {}
 
@@ -41,14 +43,13 @@ class E5Encoder:
                 from sentence_transformers import SentenceTransformer
 
                 self._model = SentenceTransformer(E5_MODEL)
-            # The e5 model card asks for the "query: " prefix when embeddings are used as features.
-            prefixed = [f"query: {text}" for text in missing]
+            prefixed = [f"{self._prefix}{text}" for text in missing]
             vectors = self._model.encode(prefixed, normalize_embeddings=True)
             self._cache.update(zip(missing, vectors, strict=True))
         return np.stack([self._cache[text] for text in texts])
 
     def __getstate__(self) -> dict:
-        return {"_model": None, "_cache": {}}
+        return {"_prefix": self._prefix, "_model": None, "_cache": {}}
 
     def __deepcopy__(self, _memo: dict) -> "E5Encoder":
         # sklearn's clone deep-copies kw_args; the encoder is not fitted, so folds share it.
