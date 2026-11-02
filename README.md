@@ -17,17 +17,32 @@ Each phase has two parts. `build` is code plus unit tests, which needs no servic
 runs the phase against the real Postgres, KoSIT validator, LLM and Docker. A phase counts as
 finished only when both are done.
 
-### Quick start (until the dev container exists)
+### Quick start
+
+Needs Docker with Compose. Python, tesseract (with the German data) and the pinned packages
+live in the dev container; Postgres with pgvector and the KoSIT validator run beside it.
 
 ```bash
 git clone https://github.com/PranavMaheshwari06/einvoice-agent.git
 cd einvoice-agent
-python3 -m venv .venv && source .venv/bin/activate
-make install        # the sentence-transformers extra needs the PyTorch CPU wheels
-make fetch          # public test data into data/raw/
-make check          # ruff and the unit tests
-claude              # then /check, then /build
+make up             # builds the images, starts dev, postgres and validator
 ```
+
+Then open the folder in VS Code and choose "Reopen in Container". In the container terminal:
+
+```bash
+make fetch              # public test data into data/raw/
+make check              # ruff and the unit tests
+make test-integration   # tests that call Postgres and the validator
+claude                  # then /check, then /build
+```
+
+Without VS Code, run a command in the container with
+`docker compose -f deploy/compose.yaml exec dev make check`. `make down` stops the services; the
+database and the Hugging Face model cache stay in Docker volumes.
+
+`requirements.lock` pins every package, with the PyTorch CPU wheels. After changing
+`pyproject.toml`, run `make lock` on the host and rebuild with `make up`.
 
 On Windows, clone inside the WSL filesystem (`~/`), not under `/mnt/c`.
 

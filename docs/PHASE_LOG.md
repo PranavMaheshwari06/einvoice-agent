@@ -46,3 +46,19 @@ recorded in STATE.md: isotonic calibration did not beat the raw model on validat
 cut coverage at 98 % precision, and the test coverage at zero wrong bookings is low. Reports
 from that run stayed out of the repo because they come from a stub. Result: ruff clean, 211
 passed, 2 skipped (OCR). Next: S3, A5 build, Opus.
+
+## L1, R0a (2026-11-02)
+
+Built the dev environment: `.devcontainer/devcontainer.json`, `deploy/docker/Dockerfile`
+(python 3.12 slim, tesseract with German data, packages from `requirements.lock`, uid 1000),
+`deploy/docker/validator.Dockerfile` (Temurin 21 JRE, KoSIT validator 1.6.3, XRechnung
+configuration 2026-08-31, daemon on 8081), `deploy/compose.yaml` (dev, postgres with pgvector,
+validator; profile `core`, localhost ports), `requirements.lock` (172 lines, torch CPU wheel,
+no CUDA packages) and the Makefile targets `up`, `down`, `test-integration`, `lock`; the README
+quick start is rewritten. Verified live: the validator daemon answers a POST of 01.01a UBL
+with 200 and a report; in the container `make check` gives 213 passed and none skipped (the two
+OCR tests ran for the first time), `make test-integration` gives 1 passed, Postgres answers
+and offers pgvector 0.8.7; the devcontainer CLI brings the stack up and runs the same tests;
+a fresh clone of the pushed branch repeated all of it. One bug found on the way: a downloaded
+`ADD` file is unreadable for the non-root validator user, fixed with `--chmod=644`. Not
+checked: the "Reopen in Container" button itself. Next: R0b live, or S3 (A5 build).

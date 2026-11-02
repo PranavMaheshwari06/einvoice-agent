@@ -1,0 +1,14 @@
+{
+  "name": "einvoice-agent",
+  "dockerComposeFile": "../deploy/compose.yaml",
+  "service": "dev",
+  "runServices": ["dev", "postgres", "validator"],
+  "workspaceFolder": "/workspace",
+  "remoteUser": "dev",
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python", "charliermarsh.ruff"],
+      "settings": { "python.defaultInterpreterPath": "/usr/local/bin/python" }
+    }
+  }
+}
