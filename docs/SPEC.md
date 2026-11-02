@@ -161,7 +161,10 @@ One function `chat_model(settings)` with if/elif on `LLM_PROVIDER`:
 - `ollama`: `ChatOpenAI(base_url=OLLAMA_BASE_URL + "/v1", api_key="ollama", model=LLM_MODEL)`.
 - `openai`: `ChatOpenAI(model=LLM_MODEL)`.
 - `anthropic`: `ChatAnthropic(model=LLM_MODEL)`.
-A `--record` flag on `einvoice eval` (Stage B) saves real responses as new replay fixtures.
+A `--record` flag on `einvoice eval` (A5, live) saves real responses as new replay fixtures.
+The `openai` branch also covers any OpenAI-compatible endpoint (Google Gemini, Groq,
+OpenRouter) through `OPENAI_BASE_URL`; the A5 provider probe decides which model records the
+fixtures. API keys come from `Settings`, not from the process environment.
 
 ### 3.9 Feedback and retraining
 Approving or correcting a proposal stores a row in `corrections` (field, old, new). The GL
@@ -189,10 +192,19 @@ drafthorse) and validates it with KoSIT. Same code the synthetic generator uses.
 - FastAPI (`api/main.py`): `POST /invoices` (upload, runs the pipeline), `GET /invoices/{id}`,
   `GET /reviews`, `POST /reviews/{id}/agent`, `POST /proposals/{id}/approve`,
   `POST /proposals/{id}/correct`, `GET /health`, `GET /metrics`.
-- Streamlit (`ui/app.py`), German and English (a dict of UI strings, toggle in the sidebar):
-  inbox; invoice view with the PDF page next to extracted fields, each field showing its
-  evidence and confidence; check results; review queue with the agent's proposal, citations,
-  optional German vendor email, and Approve / Correct / Reject.
+- Web UI, German and English (UI strings in one dict, language toggle). Streamlit is the
+  placeholder in this SPEC; the stack is decided in A6a after the owner reviews a prototype
+  (candidate: FastAPI + Jinja2 + HTMX, no Node build). Screens: inbox; invoice view with the
+  PDF page next to the extracted fields, each field showing its evidence and confidence; check
+  results; review queue with the agent's proposal, citations, optional German vendor email,
+  and Approve / Correct / Reject.
+
+### 3.13 End-to-end function (`pipeline.py`)
+One function `process(path, context_source, ...)` runs detect, parse or extract, KoSIT
+validation, the rules engine and the GL suggestion, and returns the `Invoice`, the check
+results and the `Decision`. `evaluate.py` and the API both call it, so the evaluated path is the
+served path. The KoSIT client, the chat model and the GL model are passed in, which is also how
+tests replace them. It does not write to the database; persistence is in `db.py` (A6b).
 
 ## 4. Data
 
@@ -248,16 +260,19 @@ in a `jsonb` column plus indexed columns), `checks`, `decisions`, `proposals`, `
 `corrections`, `rule_chunks` (with `embedding vector(384)`), `drift_runs`.
 Unique constraint on (seller_vat_id, invoice_number) backs the duplicate rule.
 
-## 7. Deployment (written in Stage A, run in Stage B)
+## 7. Deployment (built phase by phase; the environment first, the rest in A4-A8)
+- Dev container (`.devcontainer/`, R0a): VS Code opens the repo in the `dev` Compose service, so a
+  fresh clone gives the same Python, tesseract and pinned packages (`requirements.lock`).
 - One Docker image (`deploy/docker/Dockerfile`, python slim, CPU-only torch wheels) used for
   api, ui and jobs with different commands; a second small image for the KoSIT validator
   (`deploy/docker/validator.Dockerfile`, Temurin JRE, daemon on port 8081).
-- `deploy/compose.yaml`: postgres (pgvector/pgvector), validator, mlflow, api, ui,
-  prometheus, grafana.
+- `deploy/compose.yaml`: dev, postgres (pgvector/pgvector), validator from R0a; mlflow from A4;
+  api, ui from A6b; prometheus, grafana from A7. Services sit in profiles (`core`, `ml`, `obs`)
+  so a laptop with 6 GB RAM runs only what a phase needs.
 - `deploy/k8s/` (kustomize): postgres StatefulSet + PVC, validator, mlflow, api, ui
   Deployments and Services, drift CronJob (daily), Prometheus and Grafana (plain manifests),
   Secret for DB password created by the user (`kubectl create secret ...`, never in git).
-- `.github/workflows/ci.yml`: `on: workflow_dispatch` only until Stage B. Jobs: ruff + unit
+- `.github/workflows/ci.yml`: `on: workflow_dispatch` only until A9. Jobs: ruff + unit
   tests; eval gate (`einvoice eval --provider replay --fixtures`, fails if risk > 0 at the
   chosen thresholds or coverage drops below `reports/baseline.json`); build and push image to
   GHCR (main only); kind smoke test (create cluster, `kubectl apply -k`, wait, curl `/health`).
@@ -268,38 +283,55 @@ Unique constraint on (seller_vat_id, invoice_number) backs the duplicate rule.
 
 ## 8. Phases
 
-### Stage A: write the code, run unit tests (work machine, WSL, Copilot)
-No Docker, Kubernetes, Postgres, LLM, API keys or cloud. Fetching the public data is fine.
-After every phase: `ruff check . && pytest -m "not integration" -q` must pass, STATE.md is
-updated, and the phase is committed.
+The build order is fixed. Each phase has a `build` part (code and unit tests; works without
+services) and a `live` part (checked against the real Postgres, KoSIT validator, LLM, Docker).
+A phase is finished when both are done, its UNVERIFIED lines are closed, `ruff` and
+`pytest -m "not integration"` pass, `pytest -m integration` passes for what it touched, its
+design note and `docs/PHASE_LOG.md` entry exist, and STATE.md is updated. A session without
+services (the cloud) does the `build` part and records what it could not run as UNVERIFIED.
 
-| Phase | Produces | Check |
-|---|---|---|
-| A0 Scaffold | `pyproject.toml`, `Makefile`, `.env.example`, `.gitignore`, `LICENSE` (MIT), `DATA_SOURCES.md`, `scripts/fetch_data.py`, `src/einvoice/{__init__,config,cli}.py`, `tests/unit/test_cli.py` | venv created, `pip install -e ".[dev,agent,api,ui]"` works, `python scripts/fetch_data.py` fills `data/raw/`, `einvoice --help` lists subcommands |
-| A1 Core | `models.py`, `parsing/*`, `validation/kosit.py`, `rules/*` incl. `legal.py`, `tests/fixtures/` (a dozen testsuite/corpus files + NOTICE + one saved KoSIT report) | parsers read all fixtures; each rule has passing and failing cases |
-| A2 Data | `synth/generate.py`, `data/rules/ap_policy.md`, `data/rules/skr03_subset.csv`, `db/migrations/*.sql`, `db/db.py` | `einvoice seed --seed 1 --out data/synth` writes files + `gold.jsonl`; generated XML parses with the A1 parsers; same seed gives same output |
-| A3 Extraction | `extraction/*`, prompt file, `tests/fixtures/replay/extract_*.json` (hand-written for 3 corpus PDFs) | quote check sets confidence 0 on a planted wrong quote; replay extraction returns a valid `ExtractedInvoice` |
-| A4 Models + eval | `ml/coding.py`, `ml/train.py`, `convert.py`, `evaluate.py` | `einvoice train` logs both models to `./mlruns` and registers `champion`; `einvoice eval` writes `reports/metrics.json` and `reports/risk_coverage.png` on the synthetic gold set (structured + replay paths) |
-| A5 Agent | `agent/*`, `llm.py`, `evals/agent_cases.yaml` (~30 cases), replay fixtures per case | graph returns a valid `AgentProposal` for each replay case; guardrail tests: unknown citation -> escalate, empty retrieval -> escalate |
-| A6 API + UI | `api/main.py`, `ui/app.py` | TestClient tests for every endpoint with DB calls stubbed; `streamlit run` is not required here |
-| A7 Monitoring | metrics in `api/main.py`, `ml/drift.py`, `deploy/grafana/einvoice.json`, `einvoice retrain` | PSI unit test on known distributions; `/metrics` contains the metric names |
-| A8 Infra | `deploy/docker/*`, `deploy/compose.yaml`, `deploy/k8s/*`, `.github/workflows/ci.yml`, `deploy/terraform/*` | files exist; `docker compose config` / `terraform validate` are left for Stage B (listed in UNVERIFIED) |
-| A9 Handoff | `README.md` (project README, results marked "pending Stage B" except the A4 synthetic numbers taken from `reports/metrics.json`), `docs/notes/*.md`, STATE.md with the UNVERIFIED list and "Next: B0" | everything committed; then stop and ask the user to push |
+| Phase | Produces | Live check | STOP |
+|---|---|---|---|
+| A0 Scaffold (done) | `pyproject.toml`, `Makefile`, `.env.example`, `.gitignore`, `LICENSE`, `DATA_SOURCES.md`, `scripts/fetch_data.py`, `src/einvoice/{__init__,config,cli}.py` | `einvoice --help` lists subcommands | |
+| A1 Core (done) | `models.py`, `parsing/*`, `validation/kosit.py`, `rules/*` incl. `legal.py`, `tests/fixtures/` (a dozen files, NOTICE, one KoSIT report) | parsers read all fixtures; each rule has passing and failing cases | |
+| A2 Data (done) | `synth/*`, `data/rules/ap_policy.md`, `data/rules/skr03_subset.csv`, `db/migrations/*.sql`, `db/db.py`, `convert.py` (`invoice_to_cii`) | `einvoice seed --seed 1` output parses with the A1 parsers; same seed, same output | |
+| A3 Extraction (done) | `extraction/*`, prompt file, `tests/fixtures/replay/extract_*.json` | quote check sets confidence 0 on a planted wrong quote | |
+| R0a Environment | `.devcontainer/`, `deploy/docker/Dockerfile`, `deploy/docker/validator.Dockerfile`, `deploy/compose.yaml` (dev, postgres, validator), `requirements.lock`, Makefile targets, README quick start | fresh clone: "Reopen in Container", `make check` and `make test-integration` pass | |
+| R0b Catch-up | fixes found by the audit of A0-A3 (see STATE.md), integration tests for DB and validator | every UNVERIFIED line of A0-A3 closed; `pytest -m integration` green | |
+| A4 Models + eval | `ml/coding.py`, `ml/train.py`, `convert.py` (+ KoSIT check, `convert` command), `pipeline.py`, `evaluate.py`, `train` and `eval` commands, `mlflow` service in Compose | `einvoice train` logs both models and registers `champion`; `einvoice eval` writes `reports/metrics.json` and `reports/risk_coverage.png` with the live validator | |
+| A5 Agent | `agent/*`, `llm.py`, `evals/agent_cases.yaml` (about 30 cases), replay fixtures per case | provider probe, `einvoice eval --record`, re-recorded extraction fixtures, `reports/agent_eval.json` | owner reviews recorded fixtures and extraction accuracy |
+| A6a UI design | UI brief, user flows, clickable prototype, German/English string list | owner approves the prototype | owner approves or edits the design and may supply a template |
+| A6b API + UI | `api/main.py`, persistence functions in `db.py`, the approved UI | upload, review, approve, booking against Compose Postgres | owner tries 5 cases in the UI |
+| A7 Monitoring | metrics in `api/main.py`, `ml/drift.py`, `einvoice retrain`, `einvoice drift`, `deploy/grafana/einvoice.json`, Prometheus in Compose | Grafana shows live metrics; a drift row is written | |
+| A8 Infra | full `deploy/docker/*`, `deploy/compose.yaml`, `deploy/k8s/*`, `.github/workflows/ci.yml` (dispatch-only), `deploy/terraform/*` | full Compose stack; kind deploy with `/health` and the drift CronJob; `terraform validate` | |
+| A9 Ship | CI on push/PR, Azure demo, `docs/RELEASE_CHECKLIST.md`, `README.md` with numbers from `reports/`, demo GIF, `docs/notes/*` | CI green; public URL works during the demo; release gate passed | before the first GHCR push; before Azure (owner sets a budget); release gate sign-off before the repo is public |
 
-### Stage B: run everything (personal machine, Claude Code)
+Test commands: `ruff check . && pytest -m "not integration" -q` for every phase;
+`pytest -m integration -q` where the phase touched a service.
 
-| Phase | Do | Check |
-|---|---|---|
-| B0 | clone, venv, install, fetch data, work through UNVERIFIED | `pytest -m "not integration"` green |
-| B1 | `docker compose up postgres validator mlflow`, `einvoice db migrate`, `einvoice seed`, load into DB | `pytest -m integration` green |
-| B2 | real LLM (Ollama or API key in `.env`), `einvoice eval --record` on the corpus | extraction accuracy in `reports/metrics.json`; STOP: user reviews it |
-| B3 | train on full data, promote champion | MLflow UI shows both runs and the alias |
-| B4 | agent eval with the real model | per-case results in `reports/agent_eval.json`; STOP: user tries 5 cases in the UI |
-| B5 | full compose stack | upload -> review -> approve -> booking works in the UI |
-| B6 | kind cluster, `kubectl apply -k deploy/k8s`, drift CronJob | Grafana shows live metrics |
-| B7 | enable push/PR triggers in CI | CI green; STOP before the first GHCR push |
-| B8 | Azure: STOP first (user sets budget, confirms), `terraform apply`, record demo, `terraform destroy` | public URL works during the demo |
-| B9 | README results from `reports/`, demo GIF; review `.github/prompts/` and `CLAUDE.md` before making the repo public | README numbers match `reports/metrics.json` |
+### Release gate (A9)
+
+Run by the agent, one result per item written to `docs/RELEASE_CHECKLIST.md`, signed off by
+the owner before the repository is public.
+
+- Secrets: scan the working tree and the full git history (gitleaks or trufflehog in a
+  container, plus GitHub secret scanning). `.env`, `mlflow.db`, Terraform state,
+  `.claude/settings.local.json` and key files are not tracked and never were. Rotate any key
+  that ever appeared in a file.
+- Personal data: search fixtures, `DATA_SOURCES.md`, docs and git author metadata for names,
+  emails and IBANs that are not from the generator. Confirm every corpus file is public and has
+  its licence notice. The commit email is a no-reply address.
+- Dependencies and images: `pip-audit` on `requirements.lock`, Trivy on both images, licence
+  check of the dependencies against the repository's MIT licence.
+- Hardening: no default passwords outside local Compose; Compose ports bound to localhost;
+  Kubernetes and Terraform read secrets from Secrets or variables; upload size limit and file
+  type check in the API; XML parsing safe against XXE (retest with a hostile sample); CORS and
+  CSRF settings of the web app; no stack traces in API responses.
+- Agent safety: the guardrail tests pass (no booking tool, unknown citation escalates, empty
+  retrieval escalates); invoices with instructions hidden in the PDF text do not change the
+  decision.
+- Repository hygiene: `CLAUDE.md`, `.claude/`, `STATE.md` and the docs contain no private notes
+  or machine paths; branch protection on `main`; secret scanning and Dependabot enabled.
 
 ## 9. Design note template (`docs/notes/<topic>.md`)
 

@@ -1,4 +1,4 @@
-.PHONY: install lint test fetch
+.PHONY: install lint test check fetch
 
 install:
 	pip install -e ".[dev,agent,api,ui]"
@@ -8,6 +8,8 @@ lint:
 
 test:
 	pytest -m "not integration" -q
+
+check: lint test
 
 fetch:
 	python scripts/fetch_data.py

@@ -22,6 +22,7 @@ from einvoice.models import (
     Invoice,
     LineItem,
     PoLine,
+    PriorInvoice,
     PurchaseOrder,
     VatBreakdown,
     Vendor,
@@ -427,6 +428,22 @@ def generate(seed: int, out: Path, count: int = 2000) -> None:
         for record in gold:
             file.write(json.dumps(record, ensure_ascii=False) + "\n")
     log.info("wrote %d invoices to %s", count, out)
+
+
+def read_gold(directory: Path) -> list[dict]:
+    lines = (directory / "gold.jsonl").read_text(encoding="utf-8").splitlines()
+    return [json.loads(line) for line in lines]
+
+
+def prior_invoice(record: dict) -> PriorInvoice:
+    """A gold record as the ledger holds it once received; a missing VAT id stays missing."""
+    return PriorInvoice(
+        seller_vat_id=None if record["problem"] == "missing_vat_id" else record["vendor_vat_id"],
+        seller_name=record["vendor_name"],
+        number=record["number"],
+        gross_total=Decimal(record["gross_total"]),
+        issue_date=date.fromisoformat(record["issue_date"]),
+    )
 
 
 def read_master_data(directory: Path) -> tuple[list[Vendor], list[PurchaseOrder]]:

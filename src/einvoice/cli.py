@@ -1,5 +1,7 @@
 import argparse
+import json
 import logging
+import os
 import re
 from collections.abc import Sequence
 from pathlib import Path
@@ -40,6 +42,76 @@ def db_load(args: argparse.Namespace) -> None:
     print(f"loaded master data from {args.dir}")
 
 
+def train(args: argparse.Namespace) -> None:
+    from einvoice.ml.coding import E5_MODEL, E5Encoder
+    from einvoice.ml.train import train as train_models
+
+    settings = get_settings()
+    report = train_models(
+        args.dir, E5Encoder(), E5_MODEL, settings.mlflow_tracking_uri, Path("reports")
+    )
+    for name, scores in report["models"].items():
+        print(f"{name}: validation {scores['validation']}")
+    print(f"champion: {report['champion']} (registered as gl-coder@champion)")
+
+
+def evaluate(args: argparse.Namespace) -> None:
+    from functools import partial
+
+    from einvoice.evaluate import evaluate as run_evaluation
+    from einvoice.ml.coding import suggest_account
+    from einvoice.ml.train import load_champion
+    from einvoice.models import ValidationResult
+    from einvoice.validation import kosit
+
+    settings = get_settings()
+    model, encoder = load_champion(settings.mlflow_tracking_uri)
+    if args.fixtures:
+
+        def validate(_xml: bytes) -> ValidationResult:
+            return ValidationResult(accepted=True, errors=[])
+
+        kosit_note = "not called (--fixtures); structured invoices counted as accepted"
+    else:
+        validate = partial(kosit.validate, validator_url=settings.validator_url)
+        kosit_note = f"live validator at {settings.validator_url}"
+    metrics = run_evaluation(
+        args.dir,
+        validate,
+        kosit_note,
+        partial(suggest_account, model),
+        encoder,
+        args.dir / "replay",
+        Path("reports"),
+    )
+    print(json.dumps(metrics["test"], indent=1))
+    print("wrote reports/metrics.json and reports/risk_coverage.png")
+
+
+def convert(args: argparse.Namespace) -> None:
+    from functools import partial
+
+    from einvoice.convert import to_xrechnung
+    from einvoice.models import STRUCTURED_FORMATS
+    from einvoice.parsing.detect import detect_format
+    from einvoice.pipeline import read_structured
+    from einvoice.validation import kosit
+
+    content = args.file.read_bytes()
+    file_format = detect_format(content)
+    if file_format not in STRUCTURED_FORMATS:
+        raise SystemExit(f"{args.file} is a {file_format}; convert reads UBL, CII or ZUGFeRD")
+    invoice, _ = read_structured(content, file_format)
+    validate = partial(kosit.validate, validator_url=get_settings().validator_url)
+    xml, result = to_xrechnung(invoice, validate)
+    args.out.write_bytes(xml)
+    print(f"wrote {args.out}; KoSIT accepted={result.accepted}")
+    for error in result.errors:
+        print(f"  {error.rule_id}: {error.message}")
+    if not result.accepted:
+        raise SystemExit(1)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="einvoice", description="German e-invoice AP pipeline")
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -61,10 +133,34 @@ def build_parser() -> argparse.ArgumentParser:
     load = database_commands.add_parser("load", help="load vendors and purchase orders from seed")
     load.add_argument("--dir", type=Path, default=Path("data/synth"))
     load.set_defaults(handler=db_load)
+
+    train_command = subcommands.add_parser(
+        "train", help="train the GL-account models and register the champion in MLflow"
+    )
+    train_command.add_argument("--dir", type=Path, default=Path("data/synth"))
+    train_command.set_defaults(handler=train)
+
+    eval_command = subcommands.add_parser(
+        "eval", help="risk-coverage evaluation; writes reports/metrics.json"
+    )
+    eval_command.add_argument("--dir", type=Path, default=Path("data/synth"))
+    eval_command.add_argument(
+        "--fixtures", action="store_true", help="skip KoSIT and count structured input as accepted"
+    )
+    eval_command.set_defaults(handler=evaluate)
+
+    convert_command = subcommands.add_parser(
+        "convert", help="write a structured invoice as XRechnung CII and validate it with KoSIT"
+    )
+    convert_command.add_argument("file", type=Path)
+    convert_command.add_argument("--out", type=Path, required=True)
+    convert_command.set_defaults(handler=convert)
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> None:
+    # MLflow sends usage telemetry by default; this program reports nothing to third parties.
+    os.environ.setdefault("MLFLOW_DISABLE_TELEMETRY", "true")
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     args = build_parser().parse_args(argv)
     args.handler(args)

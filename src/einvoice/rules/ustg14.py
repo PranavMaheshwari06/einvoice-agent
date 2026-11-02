@@ -81,9 +81,13 @@ def check_mandatory_fields(invoice: Invoice, context: RuleContext) -> list[Check
     ]
 
 
+def compact_vat_id(vat_id: str) -> str:
+    return vat_id.replace(" ", "").upper()
+
+
 def is_valid_german_vat_id(vat_id: str) -> bool:
     """DE + 9 digits; the last digit is the ISO 7064 MOD 11,10 check digit of the first eight."""
-    compact = vat_id.replace(" ", "").upper()
+    compact = compact_vat_id(vat_id)
     if not GERMAN_VAT_ID.fullmatch(compact):
         return False
     product = 10
@@ -96,7 +100,7 @@ def is_valid_german_vat_id(vat_id: str) -> bool:
 def check_vat_id(invoice: Invoice, context: RuleContext) -> list[CheckResult]:
     if invoice.seller_vat_id is None:
         return []
-    vat_id = invoice.seller_vat_id.value.replace(" ", "").upper()
+    vat_id = compact_vat_id(invoice.seller_vat_id.value)
     if not vat_id.startswith("DE"):
         return [
             CheckResult(

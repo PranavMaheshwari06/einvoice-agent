@@ -57,3 +57,10 @@ def test_every_failing_check_is_a_reason_once(ready_invoice, ready_context):
     _, decision = run(invoice, replace(ready_context, validation=None))
     assert decision.kind == "REVIEW"
     assert decision.reasons == ["MISSING_DELIVERY_DATE", "BANK_DETAILS_CHANGED", "NOT_VALIDATED"]
+
+
+def test_extraction_reasons_send_an_extracted_invoice_to_review(ready_invoice, ready_context):
+    extracted = as_extracted(ready_invoice, confidence=1.0)
+    context = replace(ready_context, extraction_reasons=["EVIDENCE_NOT_FOUND"])
+    _, decision = run(extracted, context)
+    assert decision.reasons == ["EVIDENCE_NOT_FOUND"]
