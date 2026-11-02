@@ -10,6 +10,7 @@ from einvoice.evaluate import (
     booking_errors,
     evaluate,
     operating_point,
+    rule_of_three,
     run_gold,
     summarize,
     sweep,
@@ -172,3 +173,31 @@ def test_rule_of_three_bound(evaluated):
     assert result["auto_booked"] > 0
     expected = 3 / result["auto_booked"] if result["wrong"] == 0 else None
     assert result["risk_upper_95"] == expected
+
+
+def test_rule_of_three_is_capped_and_only_defined_without_errors():
+    assert rule_of_three(300, 0) == pytest.approx(0.01)
+    assert rule_of_three(2, 0) == 1.0
+    assert rule_of_three(300, 1) is None
+    assert rule_of_three(0, 0) is None
+
+
+def test_a_spaced_vat_id_is_the_same_vendor(gold_dir):
+    invoice, record = _structured(gold_dir, lambda r: not r["must_review"])
+    spaced = invoice.seller_vat_id.value[:2] + " " + invoice.seller_vat_id.value[2:]
+    invoice = invoice.model_copy(
+        update={"seller_vat_id": invoice.seller_vat_id.model_copy(update={"value": spaced})}
+    )
+    assert booking_errors(invoice, record["gl_account"], record) == []
+
+
+def test_a_split_without_processed_invoices_is_refused(gold_dir, suggest, tmp_path, monkeypatch):
+    from einvoice import evaluate as module
+
+    monkeypatch.setattr(
+        module,
+        "run_gold",
+        lambda *_args: ({"validation": [], "test": []}, {"validation": 3, "test": 0}),
+    )
+    with pytest.raises(ValueError, match="no validation invoice could be processed"):
+        evaluate(gold_dir, lambda _xml: ACCEPT, "x", suggest, "tfidf", tmp_path, tmp_path / "r")

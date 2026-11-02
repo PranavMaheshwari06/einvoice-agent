@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
-from typing import Generic, Literal, TypeVar
+from typing import Any, Generic, Literal, TypeVar
 
 import pydantic
 from pydantic import BaseModel
@@ -30,7 +30,7 @@ class Field(BaseModel, Generic[T]):
     confidence: float = pydantic.Field(default=1.0, ge=0.0, le=1.0)
 
 
-def value_of(optional: Field | None):
+def value_of(optional: Field | None) -> Any:
     return None if optional is None else optional.value
 
 

@@ -1,12 +1,13 @@
 from datetime import timedelta
 
 from einvoice.models import CheckResult, Invoice, RuleContext
+from einvoice.rules.ustg14 import compact_vat_id
 
 DUPLICATE_WINDOW = timedelta(days=7)
 
 
 def _compact(vat_id: str | None) -> str | None:
-    return vat_id.replace(" ", "").upper() if vat_id else None
+    return compact_vat_id(vat_id) if vat_id else None
 
 
 def check_duplicates(invoice: Invoice, context: RuleContext) -> list[CheckResult]:

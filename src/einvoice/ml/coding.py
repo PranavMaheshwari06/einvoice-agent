@@ -3,6 +3,7 @@
 from collections.abc import Callable, Sequence
 
 import numpy as np
+from sklearn.base import ClassifierMixin
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
@@ -106,7 +107,7 @@ def coverage_at_precision(confidence: np.ndarray, correct: np.ndarray, precision
     return float(accepted.max() / len(ranked)) if accepted.size else 0.0
 
 
-def suggest_account(model, invoice: Invoice) -> tuple[str, float] | None:
+def suggest_account(model: ClassifierMixin, invoice: Invoice) -> tuple[str, float] | None:
     """Account and probability for the invoice's largest named line; None when no line is named."""
     named = [line for line in invoice.lines if line.item_name is not None]
     if not named or invoice.seller_name is None:

@@ -21,6 +21,7 @@ from einvoice.models import (
 )
 from einvoice.pipeline import Complete, Outcome, Suggest, Validate, process
 from einvoice.rules import engine
+from einvoice.rules.ustg14 import compact_vat_id
 from einvoice.synth.generate import prior_invoice, read_gold, read_master_data
 
 logger = logging.getLogger(__name__)
@@ -36,10 +37,15 @@ class Evaluated:
     errors: list[str]
 
 
+def _vat_id(invoice: Invoice) -> str | None:
+    """Extracted ids may carry spaces ("DE 123 456 789"); master data and gold hold them compact."""
+    return None if invoice.seller_vat_id is None else compact_vat_id(invoice.seller_vat_id.value)
+
+
 def booking_errors(invoice: Invoice, gl_account: str | None, record: dict) -> list[str]:
     """What makes an automatic booking wrong (SPEC section 2); empty means it was right."""
     stated = {
-        "vendor": value_of(invoice.seller_vat_id),
+        "vendor": _vat_id(invoice),
         "net": value_of(invoice.tax_exclusive_total),
         "vat": value_of(invoice.vat_total),
         "gross": value_of(invoice.gross_total),
@@ -66,7 +72,7 @@ def _context(
 ) -> RuleContext:
     """Master data is looked up by what the invoice states, as it would be in production."""
     return RuleContext(
-        vendor=vendors.get(value_of(invoice.seller_vat_id)),
+        vendor=vendors.get(_vat_id(invoice)),
         purchase_order=orders.get(value_of(invoice.po_number)),
         prior_invoices=prior,
     )
@@ -98,11 +104,9 @@ def run_gold(
         split = record["split"]
         complete = _replay(replay_dir, record)
         structured = record["format"] in STRUCTURED_FORMATS
-        if split not in evaluated:
-            pass
-        elif not structured and complete is None:
+        if split in evaluated and not structured and complete is None:
             skipped[split] += 1
-        else:
+        elif split in evaluated:
             context_for = partial(_context, vendor_by_vat_id, order_by_number, list(prior))
             content = (directory / record["file"]).read_bytes()
             outcome = process(content, context_for, validate, complete or _no_model, suggest)
@@ -155,6 +159,13 @@ def _at(points: list[dict], chosen: dict) -> dict:
     )
 
 
+def rule_of_three(booked: int, wrong: int) -> float | None:
+    """95% upper bound on the risk after zero errors in `booked` (3/n, at most 1); else None."""
+    if booked == 0 or wrong > 0:
+        return None
+    return min(1.0, 3 / booked)
+
+
 def summarize(validation: list[Evaluated], test: list[Evaluated]) -> dict:
     validation_points = sweep(validation)
     test_points = sweep(test)
@@ -167,8 +178,7 @@ def summarize(validation: list[Evaluated], test: list[Evaluated]) -> dict:
             **at_test,
             "invoices": len(test),
             "risk": at_test["wrong"] / booked if booked else None,
-            # Rule of three: with zero errors in n, the 95% upper bound on the risk is 3/n.
-            "risk_upper_95": 3 / booked if booked and at_test["wrong"] == 0 else None,
+            "risk_upper_95": rule_of_three(booked, at_test["wrong"]),
         }
         result["worst_errors"] = _wrong_bookings(test, chosen)
     curve_threshold = chosen["extract_threshold"] if chosen else EXTRACT_THRESHOLDS[0]
@@ -230,6 +240,9 @@ def evaluate(
 ) -> dict:
     """Write reports/metrics.json and reports/risk_coverage.png; `kosit` says how KoSIT ran."""
     evaluated, skipped = run_gold(directory, validate, suggest, replay_dir)
+    for split, items in evaluated.items():
+        if not items:
+            raise ValueError(f"no {split} invoice could be processed (skipped: {skipped[split]})")
     metrics = {
         "kosit": kosit,
         "encoder": encoder,

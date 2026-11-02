@@ -7,7 +7,7 @@ from pathlib import Path
 
 import mlflow
 import numpy as np
-from sklearn.base import clone
+from sklearn.base import ClassifierMixin, clone
 from sklearn.metrics import accuracy_score, f1_score
 
 from einvoice.ml.coding import (
@@ -53,7 +53,7 @@ def split_lines(gold: list[dict]) -> dict[str, Lines]:
     }
 
 
-def score(model, lines: Lines) -> dict[str, float]:
+def score(model: ClassifierMixin, lines: Lines) -> dict[str, float]:
     probabilities = model.predict_proba(lines.texts)
     if not np.all((probabilities >= 0) & (probabilities <= 1)):
         raise ValueError("model returned probabilities outside [0, 1]")
@@ -132,7 +132,7 @@ def train(
     return report
 
 
-def load_champion(tracking_uri: str) -> tuple[object, str]:
+def load_champion(tracking_uri: str) -> tuple[ClassifierMixin, str]:
     """The registered champion and the encoder it was trained with."""
     mlflow.set_tracking_uri(tracking_uri)
     client = mlflow.MlflowClient()
