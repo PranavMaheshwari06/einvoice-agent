@@ -2,21 +2,21 @@
 
 Read this first in every session. Update it before every commit.
 
-Current phase: **A4 build** (session S2 next). A0 to A3 are built; R0b cloud part is done.
+Current phase: **A5 build** (session S3 next). A0 to A4 are built; R0b cloud part is done.
 Rules: `CLAUDE.md`. Design: `docs/SPEC.md`. History: `docs/PHASE_LOG.md`.
 
 ## Next session
-Branch: `pranav/a4-models-eval` (create it from `pranav/claude-code-setup`)
-Session: S2, phase A4 build, where: cloud, model: Opus
-First message: "Start S2 from STATE.md: build A4 (pipeline, ml, convert, evaluate) as listed in the brief, then hand off to S3."
+Branch: `pranav/a5-agent` (create it from `pranav/a4-models-eval`)
+Session: S3, phase A5 build, where: cloud, model: Opus
+First message: "Start S3 from STATE.md: build A5 (llm, agent, MCP tools, RAG, guardrails, agent evals) as listed in the brief, then hand off to S4."
 Brief:
-- Modules (SPEC 3.6, 3.11, 3.13, 8): `pipeline.py`, `ml/coding.py`, `ml/train.py`, `convert.py` (+ `convert` command, KoSIT call passed in), `evaluate.py`, commands `train`, `eval`.
-- `ml/coding.py`: TF-IDF word+char n-grams + logistic regression as baseline; second model = e5 embeddings + logistic regression with the encoder injected (the model download is blocked in the cloud, tests use a stub); isotonic calibration with seller-grouped folds (`CalibratedClassifierCV(pipeline, method="isotonic", cv=list(GroupKFold(5).split(X, y, sellers)))`); leave the past-account feature out (see "A4 findings").
-- `ml/train.py`: vendor-group split 24/6/10 from the generator; pick champion on validation macro-F1, report test; log params, macro-F1, accuracy, expected calibration error, coverage at 98% precision to MLflow at `sqlite:///mlflow.db`; register `gl-coder`, alias `champion`.
-- `evaluate.py`: test split, sweep `extract_threshold` and `gl_threshold`, risk-coverage curve, highest coverage at zero wrong auto-bookings, rule-of-three bound; `--fixtures` skips KoSIT (structured counted as accepted) and says so in `metrics.json`, which also records the encoder used; PDFs and scans without a replay response are skipped and counted.
-- Logic checks to write as tests: no seller in two splits, probabilities in [0, 1], calibrated probabilities beat the raw ones on validation (ECE), second model compared with the baseline, test split never used for choosing thresholds or the champion, "wrong" as defined in SPEC section 2.
-- Tick `A4 build` only. Add `[open: A4]` UNVERIFIED lines for the real e5 run, MLflow registry, live KoSIT in `eval` and `convert`.
-Do not touch: Dockerfile, Compose, devcontainer, k8s, Terraform, CI files; A5 code.
+- Read first: "A4 findings" below (calibration result to discuss with the owner), SPEC 3.7, 3.8, 8.
+- Modules (SPEC 3.7, 3.8): `llm.py` (`chat_model(settings)`, `ReplayChatModel`), `agent/mcp_server.py` (read-only tools), `agent/rag.py` (chunks with source ids, `min_similarity`), `agent/graph.py` (agent <-> tools, `finalize` into `AgentProposal`), `evals/agent_cases.yaml` (about 30 cases) with one replay fixture per case.
+- `extract_invoice` takes `complete(prompt) -> str`; wrap the chat model in a lambda. `pipeline.process` takes `complete` as well; `evaluate.run_gold` reads replay responses from `<dir>/replay/<id>.json` as `{pdf, content}`; `einvoice eval --record` should write that format.
+- Guardrails as tests: no booking tool exists, an unknown citation escalates (`UNSUPPORTED_EXPLANATION`), empty retrieval escalates (`INSUFFICIENT_EVIDENCE`), every citation came from a tool call in the run.
+- RAG needs Postgres and the e5 model: unit tests bind the tool functions directly and stub the encoder (`tests/conftest.py::stub_encode`); `E5Encoder` in `ml/coding.py` is the encoder to reuse.
+- Tick `A5 build` only. The provider probe, recording and the owner's review of recorded fixtures are the A5 live part and its STOP.
+Do not touch: Dockerfile, Compose, devcontainer, k8s, Terraform, CI files; A6 code (API, UI, persistence).
 
 ## Sessions
 One session per row. The branch of a session starts from the tip of the previous one unless
@@ -45,7 +45,7 @@ VS Code on the laptop.
 - [x] A3 Extraction (text, OCR, LLM extraction, evidence check): build; [ ] live (R0b, A5)
 - [ ] R0a Environment (dev container, Dockerfile, Compose, lockfile): build, live (laptop)
 - [ ] R0b Catch-up: [x] build (cloud, S1), [ ] live (laptop)
-- [ ] A4 Models + eval: [ ] build (S2), [ ] live
+- [ ] A4 Models + eval: [x] build (S2), [ ] live
 - [ ] A5 Agent: [ ] build (S3), [ ] live (provider probe, recording; STOP)
 - [ ] A6a UI design: [ ] prototype (S4; STOP)
 - [ ] A6b API + UI: [ ] build (S5), [ ] live (STOP)
@@ -99,13 +99,23 @@ One line each: date, decision, reason.
 - 2026-11-02: UI stack is open until A6a; `streamlit` stays in `pyproject.toml` until then. Reason: the owner wants a designed, more interactive UI and reviews a prototype first.
 - 2026-11-02: `test_three_replay_cases_exist` stays. The parametrized replay test already validates every fixture and its PDF, and the count guards against the parametrization silently becoming empty.
 - 2026-11-02: LLM for recording: try a free OpenAI-compatible provider (Gemini first) behind a probe in A5; ask the owner before using a paid provider. Reason: owner's request; replay fixtures keep tests independent of the provider.
+- 2026-11-02: GL model input is "item name | seller name" per line; the invoice account is predicted from the largest line, matching the gold label. The past-account feature is left out because grouped test sellers never have history.
+- 2026-11-02: MLflow models are logged with `serialization_format="cloudpickle"`. Reason: skops (the default in 3.17) refuses `_CalibratedClassifier` and the injected encoder; the models come only from our own training run.
+- 2026-11-02: `E5Encoder` caches vectors by text and returns itself from `__deepcopy__`. Reason: `CalibratedClassifierCV` clones the pipeline per fold and `clone` deep-copies `kw_args`, which would load the model and encode the same texts five times.
+- 2026-11-02: `train` writes `reports/gl_coder.json` (both models, validation and test, raw-model ECE). Reason: the baseline comparison needs a file under `reports/` to be quoted.
+- 2026-11-02: `engine.decide(invoice, context, results)` split out of `engine.run`, and `RuleContext.extraction_reasons` added. Reason: the threshold sweep re-decides stored results without running the checks again, and AUTO_BOOK is decided in one place.
+- 2026-11-02: `pipeline.process` takes file bytes, not a path (SPEC 3.13 says path). Reason: the API receives uploads.
+- 2026-11-02: `einvoice convert <file> --out <xml>` instead of `convert <invoice_id>` (SPEC 3.11). Reason: no stored invoices before A6b; switch to the id there.
+- 2026-11-02: `einvoice eval` reads replay responses from `<dir>/replay/<id>.json` (`{pdf, content}`, the A3 fixture format); PDFs and scans without one are skipped and counted. Thresholds: extraction 0.5 to 0.99 (6 values), GL 0 to 1 in steps of 0.01; the operating point is the highest validation coverage with zero wrong bookings, ties to the stricter thresholds; the rule-of-three bound is capped at 1.
+- 2026-11-02: `cli.main` sets `MLFLOW_DISABLE_TELEMETRY=true` unless set, and `tests/conftest.py` sets it. Reason: MLflow 3.17 sends usage telemetry over the network by default; the cloud proxy blocked it during a test run.
+- 2026-11-02: `models.value_of` and `ustg14.compact_vat_id` are shared helpers. Reason: the field-unwrap and VAT-id compaction had several copies; evaluation must compare an extracted "DE 123 456 789" with the compact master-data id.
 
-## A4 findings so far (no A4 code written yet; checked in the venv here)
-- MLflow 3.17 refuses the file store `./mlruns` (maintenance mode). `sqlite:///mlflow.db` works: runs, `mlflow.sklearn.log_model(name=...)`, `register_model`, alias `champion` and `load_model("models:/gl-coder@champion")`; artifacts still land in `./mlruns`. Plan: default `mlflow_tracking_uri` to `sqlite:///mlflow.db`, add `mlflow.db` to `.gitignore`.
-- `CalibratedClassifierCV(FrozenEstimator(...))` fails when the calibration set lacks a class (IndexError) or is tiny. `CalibratedClassifierCV(pipeline, method="isotonic", cv=list(GroupKFold(5).split(X, y, sellers)))` works with string labels and rare classes. Plan: fit on train split with seller-grouped folds, pick champion on validation macro-F1, report test.
-- `intfloat/multilingual-e5-small` downloads (~470 MB to `~/.cache/huggingface`), 384-dim, about 300 texts/s on CPU. Unit tests must replace the encoder (download = network boundary).
-- Plan for the past-account feature: leave it out, since grouped test sellers never have history (log in decision log).
-- Plan for `einvoice eval`: test split; `--fixtures` = no KoSIT call (structured counted as accepted, stated in `metrics.json`); pdf/scan without a replay response are skipped and counted in `metrics.json`.
+## A4 findings (S2, cloud run on seed 1, 2000 invoices, hashing stub instead of e5, KoSIT skipped)
+Numbers are not quoted here because they come from a stubbed run outside `reports/`; rerun
+`einvoice train` and `einvoice eval` live to get them.
+- Isotonic calibration as prescribed (`CalibratedClassifierCV`, seller-grouped `GroupKFold(5)`) did not beat the raw TF-IDF model on validation ECE, and it cut coverage at 98 % precision to a small fraction of the raw model's on both validation and test. `ensemble=False` and sigmoid did not change that. Cause: train folds (unseen sellers) are harder than the six validation sellers, so calibrated scores come out underconfident there, and isotonic steps put many lines on one plateau. Not turned into a passing test because it does not hold; `gl_coder.json` records `ece` and `ece_uncalibrated` side by side. Owner decision for the live run: keep as specified, or try top-label isotonic on out-of-fold scores.
+- Pipeline on structured invoices (fixtures mode): the rules sent every must-review invoice to review and blocked no clean invoice; every wrong booking at low thresholds was the GL account of an unseen seller. Test coverage at zero wrong bookings was low, with a wide rule-of-three bound. The headline number therefore depends on the GL model, not on the rules.
+- Part of the validation and test lines are ambiguous by item: the same item is booked to a different account by different vendors (the generator's `alt_account`), which caps accuracy for unseen sellers.
 
 ## UNVERIFIED
 Things written without being able to run them. Tag `[open: <phase>]` names the phase that
@@ -124,6 +134,11 @@ covers it, and deleting the line.
 - [open: R0b] `data/rules/skr03_subset.csv`: account numbers and names not checked against an official SKR03 list.
 - [open: R0b] `extraction/ocr.py`: `pytesseract.image_to_string(lang="deu")` and pypdfium2 `page.render(scale=300/72).to_pil()` never ran; both tests in `test_ocr.py` skip without the binary and the `deu` data.
 - [open: A5] `extraction/prompts/extract_de.txt`: never sent to a real model; whether it yields valid JSON with exact quotes (and no code fences) is unknown. Replay fixtures are hand-written, not recorded.
+- [open: A4] `ml/coding.py::E5Encoder`: `SentenceTransformer("intfloat/multilingual-e5-small").encode(..., normalize_embeddings=True)` never ran here (no HuggingFace access, sentence-transformers not installed); the "query: " prefix is from the model card. Run `einvoice train` with the real model.
+- [open: A4] `ml/train.py`: MLflow runs, registry and alias were checked only against a local SQLite store; the Compose MLflow service and `load_champion` from it are untested.
+- [open: A4] `einvoice eval` without `--fixtures`: never called the live KoSIT daemon; `reports/metrics.json` and `risk_coverage.png` with live validation do not exist yet.
+- [open: A4] `einvoice convert`: the written CII never went through the live KoSIT daemon.
+- [open: A5] `evaluate.run_gold`: PDFs and scans are skipped until replay responses exist under `<dir>/replay/`; scans also need tesseract.
 
 ## Blockers
 Anything that stopped progress twice in a row, with what was tried.

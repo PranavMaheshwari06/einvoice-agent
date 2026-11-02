@@ -29,3 +29,20 @@ checked). Audit finding 7 turned out not to be a defect: the engine emits the co
 count-only replay test stays because the parametrized test already validates each fixture.
 Result: ruff clean, 168 passed, 2 skipped (OCR). Live part of R0b (KoSIT, Postgres, tesseract)
 needs the laptop and is listed under UNVERIFIED. Next: S2, A4 build, Opus.
+
+## S2, A4 build (2026-11-02)
+
+Built `ml/coding.py` (TF-IDF baseline, e5 embeddings with an injected encoder, isotonic
+calibration on seller-grouped folds, ECE, coverage at 98 % precision, `suggest_account`),
+`ml/train.py` (vendor-grouped split check, champion on validation macro-F1, MLflow runs,
+`gl-coder@champion`, `reports/gl_coder.json`), `pipeline.py` (`process`), `evaluate.py`
+(threshold sweep, operating point on validation, test report, rule of three, plot),
+`convert.to_xrechnung` and the `train`, `eval` and `convert` commands. The rules engine got
+`decide`, so the sweep reuses stored check results instead of copying the GL gate, and
+extraction reasons now travel in `RuleContext`. A cloud run on seed 1 (2000 invoices, hashing
+stub instead of e5, KoSIT skipped) worked end to end: the rules sent every must-review
+invoice to review and every remaining wrong booking was a GL account. Two weak results are
+recorded in STATE.md: isotonic calibration did not beat the raw model on validation ECE and
+cut coverage at 98 % precision, and the test coverage at zero wrong bookings is low. Reports
+from that run stayed out of the repo because they come from a stub. Result: ruff clean, 211
+passed, 2 skipped (OCR). Next: S3, A5 build, Opus.
