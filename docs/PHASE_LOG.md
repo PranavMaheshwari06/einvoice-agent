@@ -62,3 +62,24 @@ and offers pgvector 0.8.7; the devcontainer CLI brings the stack up and runs the
 a fresh clone of the pushed branch repeated all of it. One bug found on the way: a downloaded
 `ADD` file is unreadable for the non-root validator user, fixed with `--chmod=644`. Not
 checked: the "Reopen in Container" button itself. Next: R0b live, or S3 (A5 build).
+
+## S3, A5 build (2026-11-02)
+
+Built `llm.py` (`chat_model` with replay, ollama, openai and anthropic branches; `ReplayChatModel`
+answers with recorded messages and tool calls), `agent/rag.py` (chunks of § 14 UStG per Absatz,
+the AP policy per heading and the 39 BR-DE rules from the XRechnung UBL schematron; pgvector store
+and search with a similarity cut-off and at most 8 chunks), `agent/mcp_server.py` (FastMCP with
+the four read-only tools; reads in `db.py`), `agent/graph.py` (LangGraph agent and tool node,
+`finalize` with the guardrails `INVALID_PROPOSAL`, `INSUFFICIENT_EVIDENCE`,
+`UNSUPPORTED_EXPLANATION`, a cap of 6 tool rounds) and `agent/evals.py` with 32 cases in
+`evals/agent_cases.yaml` and one hand-written replay fixture each. New commands: `db index`,
+`agent-eval [--record]` and `eval --record`; `run_gold` now takes `complete_for`. Verified here:
+the MCP server lists exactly the four read-only tools in process and over stdio (a real
+subprocess), every guardrail escalates with its code, every kept citation in the 32 replayed
+cases came from a tool call of the same run, and the e5 retrieval prefixes match the authors'
+code. Not verified: no provider, Postgres, e5 model or UStG XML was reachable from the cloud, so
+the replay results only show that the pipeline works; six `[cloud-built]` lines are in STATE.md.
+`/simplify` and `/code-review` led to the k cap, `models.NotFound` instead of `LookupError` (a
+`KeyError` in a tool no longer looks like a lookup miss), the round cap and citation recall over
+citing cases only. Result: ruff clean, 334 passed, 2 skipped (OCR). Next: S4, A6a UI design,
+Opus; A5 live on the laptop.
