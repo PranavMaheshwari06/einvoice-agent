@@ -129,9 +129,9 @@ closes the line. Closing means running the real check, adding an integration tes
 covers it, and deleting the line.
 
 - [open: L1 owner] "Reopen in Container" in VS Code was not clicked; R0a checked `.devcontainer/devcontainer.json` with the devcontainer CLI (`up`, `exec`), which reads the same file.
-- [open: R0b] `rules/legal.py`: `SMALL_AMOUNT_LIMIT` = 250 EUR (§33 UStDV) not checked against the primary source here.
-- [open: R0b] `synth/generate.py`: ZUGFeRD PDFs are reportlab PDFs with `drafthorse.pdf.attach_xml`, not PDF/A-3; pypdf reads them, a strict PDF/A or Mustang check may reject them.
-- [open: R0b] `data/rules/skr03_subset.csv`: account numbers and names not checked against an official SKR03 list.
+- [open: R0b] `rules/legal.py`: `SMALL_AMOUNT_LIMIT` = 250 EUR (§33 UStDV). L1 read gesetze-im-internet.de/ustdv_1980/__33.html: "Eine Rechnung, deren Gesamtbetrag 250 Euro nicht übersteigt". Waits for the owner to confirm; then delete the line.
+- [open: R0b] `synth/generate.py`: ZUGFeRD PDFs are reportlab PDFs with `drafthorse.pdf.attach_xml`, not PDF/A-3; pypdf reads them, a strict PDF/A or Mustang check may reject them. L1 downloaded Mustang-CLI 2.26.0 (github.com/ZUGFeRD/mustangproject) but the permission classifier refused to run the jar; owner decides whether to allow it. Control: run it on `tests/fixtures/corpus/MustangGnuaccountingBeispielRE-20201121_508.pdf` first.
+- [open: R0b] `data/rules/skr03_subset.csv`: L1 compared it with the DATEV SKR 03 list (datev.de, Art-Nr. 19606, valid 2026). 0650 is a bank-liability account there (Büroeinrichtung is 0420), 0670 likewise (Geringwertige Wirtschaftsgüter is 0480), 4610 does not exist (Werbekosten is 4600); 22 numbers match, several names differ in wording. Waits for the owner; the fix touches `synth/catalogue.py` and `tests/unit/ml/test_coding.py` too.
 - [open: A5] `extraction/prompts/extract_de.txt`: never sent to a real model; whether it yields valid JSON with exact quotes (and no code fences) is unknown. Replay fixtures are hand-written, not recorded.
 - [open: A4] `ml/coding.py::E5Encoder`: `SentenceTransformer("intfloat/multilingual-e5-small").encode(..., normalize_embeddings=True)` never ran here (no HuggingFace access, sentence-transformers not installed); the "query: " prefix is from the model card. Run `einvoice train` with the real model.
 - [open: A4] `ml/train.py`: MLflow runs, registry and alias were checked only against a local SQLite store; the Compose MLflow service and `load_champion` from it are untested.
