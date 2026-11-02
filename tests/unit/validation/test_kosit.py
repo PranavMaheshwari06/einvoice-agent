@@ -1,3 +1,5 @@
+import re
+
 import httpx
 import pytest
 
@@ -53,3 +55,15 @@ def test_live_validator_accepts_a_testsuite_invoice():
     xml = (FIXTURES / "xrechnung" / "01.01a-INVOICE_ubl.xml").read_bytes()
     result = validate(xml, get_settings().validator_url)
     assert result.accepted, result.errors
+
+
+@pytest.mark.integration
+def test_live_validator_rejects_a_missing_buyer_reference():
+    xml = (FIXTURES / "xrechnung" / "01.01a-INVOICE_ubl.xml").read_bytes()
+    without_buyer_reference = re.sub(
+        rb"\s*<cbc:BuyerReference>.*?</cbc:BuyerReference>", b"", xml, flags=re.S
+    )
+    assert without_buyer_reference != xml
+    result = validate(without_buyer_reference, get_settings().validator_url)
+    assert result.accepted is False
+    assert "BR-DE-15" in [error.rule_id for error in result.errors]

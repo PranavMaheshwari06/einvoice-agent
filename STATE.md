@@ -128,8 +128,6 @@ Things written without being able to run them. Tag `[open: <phase>]` names the p
 closes the line. Closing means running the real check, adding an integration test if none
 covers it, and deleting the line.
 
-- [open: R0b] `validation/kosit.py`: the daemon takes a POST of the raw XML at `/` and answers 200 (accept) or 406 (reject) with the report as body. R0a confirmed the 200 case with 01.01a UBL (the integration test passes); the 406 case is unchecked.
-- [open: R0b] `tests/fixtures/kosit/report_reject_br_de_15.xml`: hand-written to the report schema; replace with a real daemon report for 01.01a UBL without BuyerReference and re-run `test_kosit.py`.
 - [open: L1 owner] "Reopen in Container" in VS Code was not clicked; R0a checked `.devcontainer/devcontainer.json` with the devcontainer CLI (`up`, `exec`), which reads the same file.
 - [open: R0b] `rules/legal.py`: `SMALL_AMOUNT_LIMIT` = 250 EUR (§33 UStDV) not checked against the primary source here.
 - [open: R0b] `parsing/zugferd.py`: XRechnung PDFs attach `xrechnung.xml` (no fixture has one).
