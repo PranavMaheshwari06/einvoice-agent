@@ -1,5 +1,6 @@
 """Canonical Invoice -> XRechnung CII XML (drafthorse), also used by the synthetic generator."""
 
+from collections.abc import Callable
 from decimal import Decimal
 
 from drafthorse.models.accounting import ApplicableTradeTax
@@ -8,7 +9,7 @@ from drafthorse.models.party import TaxRegistration
 from drafthorse.models.payment import PaymentMeans, PaymentTerms
 from drafthorse.models.tradelines import LineItem as CiiLineItem
 
-from einvoice.models import Address, Field, Invoice, LineItem
+from einvoice.models import Address, Field, Invoice, LineItem, ValidationResult
 
 XRECHNUNG_ID = "urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0"
 # The canonical Invoice has no contact or electronic address, but XRechnung requires both
@@ -116,3 +117,11 @@ def invoice_to_cii(invoice: Invoice) -> bytes:
         totals.prepaid_total = invoice.prepaid_total.value
     totals.due_amount = invoice.amount_due.value
     return doc.serialize(schema="FACTUR-X_EN16931")
+
+
+def to_xrechnung(
+    invoice: Invoice, validate: Callable[[bytes], ValidationResult]
+) -> tuple[bytes, ValidationResult]:
+    """The outgoing XRechnung CII and the KoSIT verdict on it (SPEC 3.11)."""
+    xml = invoice_to_cii(invoice)
+    return xml, validate(xml)
