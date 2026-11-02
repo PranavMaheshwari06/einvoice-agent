@@ -40,3 +40,46 @@ def test_db_commands_are_listed(capsys):
     out = capsys.readouterr().out
     assert "migrate" in out
     assert "load" in out
+
+
+class FakeConnection:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_exc):
+        return False
+
+
+def test_db_migrate_reports_applied_files(monkeypatch, capsys):
+    from einvoice.db import db
+
+    monkeypatch.setattr(db, "connect", lambda _url: FakeConnection())
+    monkeypatch.setattr(db, "migrate", lambda _conn: ["001_init.sql"])
+
+    main(["db", "migrate"])
+
+    assert "applied 1 migration(s): 001_init.sql" in capsys.readouterr().out
+
+
+def test_db_migrate_says_when_nothing_was_applied(monkeypatch, capsys):
+    from einvoice.db import db
+
+    monkeypatch.setattr(db, "connect", lambda _url: FakeConnection())
+    monkeypatch.setattr(db, "migrate", lambda _conn: [])
+
+    main(["db", "migrate"])
+
+    assert capsys.readouterr().out.strip() == "applied 0 migration(s)"
+
+
+def test_db_load_passes_the_directory_to_the_loader(monkeypatch, tmp_path, capsys):
+    from einvoice.db import db
+
+    loaded = []
+    monkeypatch.setattr(db, "connect", lambda _url: FakeConnection())
+    monkeypatch.setattr(db, "load_master_data", lambda _conn, directory: loaded.append(directory))
+
+    main(["db", "load", "--dir", str(tmp_path)])
+
+    assert loaded == [tmp_path]
+    assert f"loaded master data from {tmp_path}" in capsys.readouterr().out

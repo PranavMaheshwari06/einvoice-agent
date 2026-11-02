@@ -2,14 +2,21 @@
 
 Read this first in every session. Update it before every commit.
 
-Current phase: **R0b, cloud part** (session S1). A0 to A3 are built; A4 is not started.
+Current phase: **A4 build** (session S2 next). A0 to A3 are built; R0b cloud part is done.
 Rules: `CLAUDE.md`. Design: `docs/SPEC.md`. History: `docs/PHASE_LOG.md`.
 
 ## Next session
-Branch: `pranav/claude-code-setup` (base: `main`)
-Session: S1, step 2 (R0b cloud fixes), where: cloud, model: Sonnet
-First message: "Continue S1 step 2 from STATE.md: R0b cloud fixes, then print the S2 handoff."
-Do not touch: Dockerfile, Compose, devcontainer, k8s, Terraform, CI files; A4 code.
+Branch: `pranav/a4-models-eval` (create it from `pranav/claude-code-setup`)
+Session: S2, phase A4 build, where: cloud, model: Opus
+First message: "Start S2 from STATE.md: build A4 (pipeline, ml, convert, evaluate) as listed in the brief, then hand off to S3."
+Brief:
+- Modules (SPEC 3.6, 3.11, 3.13, 8): `pipeline.py`, `ml/coding.py`, `ml/train.py`, `convert.py` (+ `convert` command, KoSIT call passed in), `evaluate.py`, commands `train`, `eval`.
+- `ml/coding.py`: TF-IDF word+char n-grams + logistic regression as baseline; second model = e5 embeddings + logistic regression with the encoder injected (the model download is blocked in the cloud, tests use a stub); isotonic calibration with seller-grouped folds (`CalibratedClassifierCV(pipeline, method="isotonic", cv=list(GroupKFold(5).split(X, y, sellers)))`); leave the past-account feature out (see "A4 findings").
+- `ml/train.py`: vendor-group split 24/6/10 from the generator; pick champion on validation macro-F1, report test; log params, macro-F1, accuracy, expected calibration error, coverage at 98% precision to MLflow at `sqlite:///mlflow.db`; register `gl-coder`, alias `champion`.
+- `evaluate.py`: test split, sweep `extract_threshold` and `gl_threshold`, risk-coverage curve, highest coverage at zero wrong auto-bookings, rule-of-three bound; `--fixtures` skips KoSIT (structured counted as accepted) and says so in `metrics.json`, which also records the encoder used; PDFs and scans without a replay response are skipped and counted.
+- Logic checks to write as tests: no seller in two splits, probabilities in [0, 1], calibrated probabilities beat the raw ones on validation (ECE), second model compared with the baseline, test split never used for choosing thresholds or the champion, "wrong" as defined in SPEC section 2.
+- Tick `A4 build` only. Add `[open: A4]` UNVERIFIED lines for the real e5 run, MLflow registry, live KoSIT in `eval` and `convert`.
+Do not touch: Dockerfile, Compose, devcontainer, k8s, Terraform, CI files; A5 code.
 
 ## Sessions
 One session per row. The branch of a session starts from the tip of the previous one unless
@@ -17,7 +24,7 @@ that one is already merged into `main`.
 
 | Session | Phase | Where / model | Branch |
 |---|---|---|---|
-| S1 | instruction files, R0b cloud fixes | cloud, Sonnet | `pranav/claude-code-setup` |
+| S1 (done) | instruction files, R0b cloud fixes | cloud, Sonnet | `pranav/claude-code-setup` |
 | S2 | A4 build | cloud, Opus | `pranav/a4-models-eval` |
 | S3 | A5 build | cloud, Opus | `pranav/a5-agent` |
 | S4 | A6a UI design | cloud, Opus | `pranav/a6a-ui-design` |
@@ -37,7 +44,7 @@ VS Code on the laptop.
 - [x] A2 Data (generator, AP policy, SKR03 subset, migrations): build; [ ] live (R0b)
 - [x] A3 Extraction (text, OCR, LLM extraction, evidence check): build; [ ] live (R0b, A5)
 - [ ] R0a Environment (dev container, Dockerfile, Compose, lockfile): build, live (laptop)
-- [ ] R0b Catch-up: [ ] build (cloud, S1), [ ] live (laptop)
+- [ ] R0b Catch-up: [x] build (cloud, S1), [ ] live (laptop)
 - [ ] A4 Models + eval: [ ] build (S2), [ ] live
 - [ ] A5 Agent: [ ] build (S3), [ ] live (provider probe, recording; STOP)
 - [ ] A6a UI design: [ ] prototype (S4; STOP)
@@ -49,11 +56,10 @@ VS Code on the laptop.
 ## R0b cloud findings (from the audit before S1)
 1. `config.py` had no key or base-URL fields and an MLflow default the library refuses. Done in S1.
 2. `CLAUDE.md` pointed at Stage B while this file said Stage A. Done in S1.
-3. `engine._evidence_reasons` reports only the first low-confidence field. Open.
-4. `legal.py` lacks the §27 Abs. 38 UStG transition dates. Open; add when a rule needs them.
-5. Missing tests: `legal.py`, `db migrate` and `db load` handlers, replay-fixture content. Open.
-6. No end-to-end function and no DB persistence or `RuleContext` builder: `pipeline.py` in A4
-   (SPEC 3.13), persistence in A6b.
+3. `engine._evidence_reasons` reports one code once; `run` de-duplicates codes, so REVIEW reasons are complete. Not a defect, closed.
+4. `legal.py` lacks the §27 Abs. 38 UStG transition dates. Deferred until a rule needs them.
+5. Missing tests for `legal.py` and the `db migrate` / `db load` handlers. Done in S1 (`test_legal.py`, `test_cli.py`).
+6. No end-to-end function and no DB persistence or `RuleContext` builder: `pipeline.py` in A4 (SPEC 3.13), persistence in A6b.
 
 ## Decision log
 One line each: date, decision, reason.
@@ -91,6 +97,7 @@ One line each: date, decision, reason.
 - 2026-11-02: The "tesseract binary is not installed in this WSL" line above is obsolete: R0a puts tesseract with the `deu` data into the dev container image.
 - 2026-11-02: `pipeline.py` added to the SPEC (3.13). Reason: `evaluate.py` and the API need the same end-to-end function.
 - 2026-11-02: UI stack is open until A6a; `streamlit` stays in `pyproject.toml` until then. Reason: the owner wants a designed, more interactive UI and reviews a prototype first.
+- 2026-11-02: `test_three_replay_cases_exist` stays. The parametrized replay test already validates every fixture and its PDF, and the count guards against the parametrization silently becoming empty.
 - 2026-11-02: LLM for recording: try a free OpenAI-compatible provider (Gemini first) behind a probe in A5; ask the owner before using a paid provider. Reason: owner's request; replay fixtures keep tests independent of the provider.
 
 ## A4 findings so far (no A4 code written yet; checked in the venv here)

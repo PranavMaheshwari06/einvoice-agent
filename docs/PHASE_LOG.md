@@ -19,3 +19,13 @@ R0a/R0b and A6a, and has the release gate; section 3.13 adds `pipeline.py`. `STA
 the session table, branch names and the "Next session" block. `Settings` got the OpenAI and
 Anthropic key fields and the SQLite MLflow default (tested in `test_config.py`). Checked
 before the change: ruff clean, 162 passed, 2 skipped (OCR). Open: the R0b cloud fixes.
+
+## S1, R0b cloud fixes (2026-11-02)
+
+Added tests for `rules/legal.py` and for the `db migrate` and `db load` CLI handlers (the
+database connection is replaced by a fake; the handlers' printed summaries and arguments are
+checked). Audit finding 7 turned out not to be a defect: the engine emits the code
+`LOW_EXTRACTION_CONFIDENCE` once and de-duplicates codes, so the reason list is complete. The
+count-only replay test stays because the parametrized test already validates each fixture.
+Result: ruff clean, 168 passed, 2 skipped (OCR). Live part of R0b (KoSIT, Postgres, tesseract)
+needs the laptop and is listed under UNVERIFIED. Next: S2, A4 build, Opus.
