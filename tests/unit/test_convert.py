@@ -1,9 +1,11 @@
 import pytest
 
 from conftest import FIXTURES
-from einvoice.convert import invoice_to_cii, to_xrechnung
+from einvoice.convert import PEPPOL_BILLING_PROCESS, invoice_to_cii, to_xrechnung
 from einvoice.models import ValidationResult
+from einvoice.parsing.cii import NS as CII_NS
 from einvoice.parsing.cii import parse_cii
+from einvoice.parsing.xmltools import parse_xml
 
 
 def test_cii_invoice_survives_a_round_trip():
@@ -43,3 +45,13 @@ def test_to_xrechnung_validates_the_written_cii():
     assert seen == [xml]
     assert result.accepted
     assert parse_cii(xml).number.value == invoice.number.value
+
+
+def test_cii_names_the_business_process():
+    # PEPPOL-EN16931-R001: BT-23 is mandatory, KoSIT rejects every document without it.
+    invoice = parse_cii((FIXTURES / "corpus" / "EN16931_Einfach.cii.xml").read_bytes())
+    ids = parse_xml(invoice_to_cii(invoice)).xpath(
+        "//ram:BusinessProcessSpecifiedDocumentContextParameter/ram:ID/text()",
+        namespaces=CII_NS,
+    )
+    assert ids == [PEPPOL_BILLING_PROCESS]

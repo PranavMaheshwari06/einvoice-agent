@@ -41,7 +41,8 @@ def _sub(parent: etree._Element, path: str, text: str | None = None, **attribute
     element = parent
     for step in path.split("/"):
         prefix, name = step.split(":")
-        element = etree.SubElement(element, f"{{{UBL_NS[prefix]}}}{name}", **attributes)
+        element = etree.SubElement(element, f"{{{UBL_NS[prefix]}}}{name}")
+    element.attrib.update(attributes)
     if text is not None:
         element.text = text
     return element

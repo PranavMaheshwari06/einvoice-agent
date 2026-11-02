@@ -12,6 +12,8 @@ from drafthorse.models.tradelines import LineItem as CiiLineItem
 from einvoice.models import Address, Field, Invoice, LineItem, ValidationResult, value_of
 
 XRECHNUNG_ID = "urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0"
+# BT-23; PEPPOL-EN16931-R001 rejects a document without it.
+PEPPOL_BILLING_PROCESS = "urn:fdc:peppol.eu:2017:poacc:billing:01:1.0"
 # The canonical Invoice has no contact or electronic address, but XRechnung requires both
 # (BR-DE-2, BR-DE-5 to 7, PEPPOL-EN16931-R010/R020), so every file carries these placeholders.
 CONTACT_NAME = "Rechnungswesen"
@@ -52,6 +54,7 @@ def invoice_to_cii(invoice: Invoice) -> bytes:
     if any(value_of(total) for total in (invoice.allowance_total, invoice.charge_total)):
         raise ValueError("document allowances and charges are not supported")
     doc = Document()
+    doc.context.business_parameter.id = PEPPOL_BILLING_PROCESS
     doc.context.guideline_parameter.id = XRECHNUNG_ID
     doc.header.id = invoice.number.value
     doc.header.type_code = value_of(invoice.type_code) or "380"
