@@ -429,6 +429,11 @@ def generate(seed: int, out: Path, count: int = 2000) -> None:
     log.info("wrote %d invoices to %s", count, out)
 
 
+def read_gold(directory: Path) -> list[dict]:
+    lines = (directory / "gold.jsonl").read_text(encoding="utf-8").splitlines()
+    return [json.loads(line) for line in lines]
+
+
 def read_master_data(directory: Path) -> tuple[list[Vendor], list[PurchaseOrder]]:
     vendors = json.loads((directory / "vendors.json").read_text(encoding="utf-8"))
     orders = json.loads((directory / "purchase_orders.json").read_text(encoding="utf-8"))

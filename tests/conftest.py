@@ -1,7 +1,14 @@
+import os
+
+# MLflow sends usage telemetry over the network by default; unit tests stay offline.
+os.environ["MLFLOW_DISABLE_TELEMETRY"] = "true"
+
 from decimal import Decimal
 from pathlib import Path
 
+import numpy as np
 import pytest
+from sklearn.feature_extraction.text import HashingVectorizer
 
 from einvoice.models import (
     Evidence,
@@ -14,9 +21,17 @@ from einvoice.models import (
     Vendor,
 )
 from einvoice.parsing.zugferd import parse_zugferd
+from einvoice.synth.generate import generate
 
 FIXTURES = Path(__file__).parent / "fixtures"
 MUSTANG_PDF = FIXTURES / "corpus" / "MustangGnuaccountingBeispielRE-20201121_508.pdf"
+SYNTH_COUNT = 200
+_HASHER = HashingVectorizer(n_features=64, alternate_sign=False, norm="l2")
+
+
+def stub_encode(texts: list[str]) -> np.ndarray:
+    """Stands in for the e5 encoder, whose download is a network boundary."""
+    return _HASHER.transform(texts).toarray()
 
 
 def xml_value(value) -> Field:
@@ -72,3 +87,11 @@ def ready_context() -> RuleContext:
         validation=ValidationResult(accepted=True, errors=[]),
         gl_probability=0.99,
     )
+
+
+@pytest.fixture(scope="session")
+def gold_dir(tmp_path_factory) -> Path:
+    """A small seeded gold set with files, master data and all three splits."""
+    directory = tmp_path_factory.mktemp("synth_small")
+    generate(seed=1, out=directory, count=SYNTH_COUNT)
+    return directory
