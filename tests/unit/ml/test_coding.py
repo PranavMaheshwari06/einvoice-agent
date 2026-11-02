@@ -2,6 +2,7 @@ import pickle
 
 import numpy as np
 import pytest
+from sklearn.base import clone
 
 from conftest import stub_encode, xml_value
 from einvoice.ml.coding import (
@@ -97,6 +98,17 @@ def test_e5_encoder_prefixes_query_and_normalizes():
 def test_e5_encoder_pickles_without_the_loaded_model():
     encoder = E5Encoder()
     encoder._model = RecordingModel()
+    encoder(["Toner | Alpha GmbH"])
     restored = pickle.loads(pickle.dumps(encoder))
     assert restored._model is None
-    assert restored.model_name == encoder.model_name
+    assert restored._cache == {}
+
+
+def test_e5_encoder_encodes_each_text_once_across_fold_copies():
+    encoder = E5Encoder()
+    encoder._model = RecordingModel()
+    pipeline = clone(embedding_model(encoder))
+    pipeline.steps[0][1].kw_args["encode"](["a", "b", "a"])
+    vectors = encoder(["b", "a"])
+    assert encoder._model.calls == [(["query: a", "query: b"], True)]
+    assert vectors.shape == (2, 3)

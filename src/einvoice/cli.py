@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging
+import os
 import re
 from collections.abc import Sequence
 from pathlib import Path
@@ -66,7 +67,10 @@ def evaluate(args: argparse.Namespace) -> None:
     settings = get_settings()
     model, encoder = load_champion(settings.mlflow_tracking_uri)
     if args.fixtures:
-        validate = lambda _xml: ValidationResult(accepted=True, errors=[])  # noqa: E731
+
+        def validate(_xml: bytes) -> ValidationResult:
+            return ValidationResult(accepted=True, errors=[])
+
         kosit_note = "not called (--fixtures); structured invoices counted as accepted"
     else:
         validate = partial(kosit.validate, validator_url=settings.validator_url)
@@ -85,6 +89,8 @@ def evaluate(args: argparse.Namespace) -> None:
 
 
 def convert(args: argparse.Namespace) -> None:
+    from functools import partial
+
     from einvoice.convert import to_xrechnung
     from einvoice.models import STRUCTURED_FORMATS
     from einvoice.parsing.detect import detect_format
@@ -96,8 +102,8 @@ def convert(args: argparse.Namespace) -> None:
     if file_format not in STRUCTURED_FORMATS:
         raise SystemExit(f"{args.file} is a {file_format}; convert reads UBL, CII or ZUGFeRD")
     invoice, _ = read_structured(content, file_format)
-    validator_url = get_settings().validator_url
-    xml, result = to_xrechnung(invoice, lambda cii: kosit.validate(cii, validator_url))
+    validate = partial(kosit.validate, validator_url=get_settings().validator_url)
+    xml, result = to_xrechnung(invoice, validate)
     args.out.write_bytes(xml)
     print(f"wrote {args.out}; KoSIT accepted={result.accepted}")
     for error in result.errors:
@@ -153,6 +159,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
+    # MLflow sends usage telemetry by default; this program reports nothing to third parties.
+    os.environ.setdefault("MLFLOW_DISABLE_TELEMETRY", "true")
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     args = build_parser().parse_args(argv)
     args.handler(args)

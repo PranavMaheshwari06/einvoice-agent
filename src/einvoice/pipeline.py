@@ -34,7 +34,6 @@ ContextFor = Callable[[Invoice], RuleContext]
 class Outcome:
     invoice: Invoice
     context: RuleContext
-    extraction_reasons: list[str]
     results: list[CheckResult]
     decision: Decision
     gl_account: str | None
@@ -48,19 +47,11 @@ def read_structured(content: bytes, file_format: Format) -> tuple[Invoice, bytes
     return parse(content), content
 
 
-def decide(
-    invoice: Invoice, context: RuleContext, extraction_reasons: list[str]
-) -> tuple[list[CheckResult], Decision]:
-    results, decision = engine.run(invoice, context)
-    reasons = list(dict.fromkeys(decision.reasons + extraction_reasons))
-    return results, Decision(kind="REVIEW" if reasons else "AUTO_BOOK", reasons=reasons)
-
-
 def process(
     content: bytes,
     context_for: ContextFor,
     validate: Validate,
-    complete: Complete | None,
+    complete: Complete,
     suggest: Suggest,
 ) -> Outcome:
     """Detect, parse or extract, validate, suggest the GL account and run the rules.
@@ -80,8 +71,9 @@ def process(
     context = replace(
         context_for(invoice),
         validation=validation,
+        extraction_reasons=extraction_reasons,
         gl_probability=None if suggestion is None else suggestion[1],
     )
-    results, decision = decide(invoice, context, extraction_reasons)
+    results, decision = engine.run(invoice, context)
     gl_account = None if suggestion is None else suggestion[0]
-    return Outcome(invoice, context, extraction_reasons, results, decision, gl_account)
+    return Outcome(invoice, context, results, decision, gl_account)

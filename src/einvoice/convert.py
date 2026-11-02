@@ -9,7 +9,7 @@ from drafthorse.models.party import TaxRegistration
 from drafthorse.models.payment import PaymentMeans, PaymentTerms
 from drafthorse.models.tradelines import LineItem as CiiLineItem
 
-from einvoice.models import Address, Field, Invoice, LineItem, ValidationResult
+from einvoice.models import Address, Field, Invoice, LineItem, ValidationResult, value_of
 
 XRECHNUNG_ID = "urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0"
 # The canonical Invoice has no contact or electronic address, but XRechnung requires both
@@ -17,10 +17,6 @@ XRECHNUNG_ID = "urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnun
 CONTACT_NAME = "Rechnungswesen"
 CONTACT_PHONE = "+49 30 1234567"
 CONTACT_EMAIL = "rechnung@example.com"
-
-
-def _value(field: Field | None):
-    return None if field is None else field.value
 
 
 def _set_address(party, address: Field[Address] | None) -> None:
@@ -35,14 +31,14 @@ def _set_address(party, address: Field[Address] | None) -> None:
 def _add_line(doc: Document, line: LineItem) -> None:
     if line.allowances or line.charges:
         raise ValueError("line allowances and charges are not supported")
-    unit = _value(line.unit) or "C62"
+    unit = value_of(line.unit) or "C62"
     item = CiiLineItem()
-    item.document.line_id = _value(line.line_id)
-    item.product.name = _value(line.item_name)
+    item.document.line_id = value_of(line.line_id)
+    item.product.name = value_of(line.item_name)
     if line.po_line_ref is not None:
         item.agreement.buyer_order.line_id = line.po_line_ref.value
     item.agreement.net.amount = line.price.value
-    item.agreement.net.basis_quantity = (_value(line.price_base_quantity) or Decimal(1), unit)
+    item.agreement.net.basis_quantity = (value_of(line.price_base_quantity) or Decimal(1), unit)
     item.delivery.billed_quantity = (line.quantity.value, unit)
     item.settlement.trade_tax.type_code = "VAT"
     item.settlement.trade_tax.category_code = line.vat_category.value
@@ -53,16 +49,16 @@ def _add_line(doc: Document, line: LineItem) -> None:
 
 def invoice_to_cii(invoice: Invoice) -> bytes:
     """Write an XRechnung CII document; fields that are None are left out."""
-    if any(_value(total) for total in (invoice.allowance_total, invoice.charge_total)):
+    if any(value_of(total) for total in (invoice.allowance_total, invoice.charge_total)):
         raise ValueError("document allowances and charges are not supported")
     doc = Document()
     doc.context.guideline_parameter.id = XRECHNUNG_ID
     doc.header.id = invoice.number.value
-    doc.header.type_code = _value(invoice.type_code) or "380"
+    doc.header.type_code = value_of(invoice.type_code) or "380"
     doc.header.issue_date_time = invoice.issue_date.value
 
     agreement = doc.trade.agreement
-    agreement.buyer_reference = _value(invoice.buyer_reference)
+    agreement.buyer_reference = value_of(invoice.buyer_reference)
     if invoice.po_number is not None:
         agreement.buyer_order.issuer_assigned_id = invoice.po_number.value
     seller, buyer = agreement.seller, agreement.buyer

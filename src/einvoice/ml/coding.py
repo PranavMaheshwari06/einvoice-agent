@@ -23,23 +23,35 @@ def line_text(item_name: str, seller_name: str) -> str:
 
 
 class E5Encoder:
-    """Loads the sentence-transformers model on first use and leaves it out of the pickle."""
+    """Loads the sentence-transformers model on first use; the model and cache stay out of pickles.
 
-    def __init__(self, model_name: str = E5_MODEL) -> None:
-        self.model_name = model_name
+    The calibrated model holds one fitted copy per fold and each encodes the same text, so
+    vectors are cached by text.
+    """
+
+    def __init__(self) -> None:
         self._model = None
+        self._cache: dict[str, np.ndarray] = {}
 
     def __call__(self, texts: list[str]) -> np.ndarray:
-        if self._model is None:
-            from sentence_transformers import SentenceTransformer
+        missing = [text for text in dict.fromkeys(texts) if text not in self._cache]
+        if missing:
+            if self._model is None:
+                from sentence_transformers import SentenceTransformer
 
-            self._model = SentenceTransformer(self.model_name)
-        # The e5 model card asks for the "query: " prefix when embeddings are used as features.
-        prefixed = [f"query: {text}" for text in texts]
-        return self._model.encode(prefixed, normalize_embeddings=True)
+                self._model = SentenceTransformer(E5_MODEL)
+            # The e5 model card asks for the "query: " prefix when embeddings are used as features.
+            prefixed = [f"query: {text}" for text in missing]
+            vectors = self._model.encode(prefixed, normalize_embeddings=True)
+            self._cache.update(zip(missing, vectors, strict=True))
+        return np.stack([self._cache[text] for text in texts])
 
     def __getstate__(self) -> dict:
-        return {"model_name": self.model_name, "_model": None}
+        return {"_model": None, "_cache": {}}
+
+    def __deepcopy__(self, _memo: dict) -> "E5Encoder":
+        # sklearn's clone deep-copies kw_args; the encoder is not fitted, so folds share it.
+        return self
 
 
 def _encode_unique(texts: Sequence[str], encode: Encoder) -> np.ndarray:

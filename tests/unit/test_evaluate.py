@@ -14,20 +14,18 @@ from einvoice.evaluate import (
     summarize,
     sweep,
 )
-from einvoice.ml.coding import calibrate, suggest_account, tfidf_model
-from einvoice.ml.train import split_lines
+from einvoice.ml.coding import suggest_account
 from einvoice.models import STRUCTURED_FORMATS, ValidationResult
-from einvoice.pipeline import decide, read_structured
+from einvoice.pipeline import read_structured
+from einvoice.rules import engine
 from einvoice.synth.generate import read_gold
 
 ACCEPT = ValidationResult(accepted=True, errors=[])
 
 
 @pytest.fixture(scope="module")
-def suggest(gold_dir):
-    train = split_lines(read_gold(gold_dir))["train"]
-    model = calibrate(tfidf_model(), train.texts, train.accounts, train.sellers)
-    return partial(suggest_account, model)
+def suggest(gl_model):
+    return partial(suggest_account, gl_model)
 
 
 @pytest.fixture(scope="module")
@@ -101,14 +99,14 @@ def test_operating_point_is_the_highest_safe_coverage():
 def test_test_split_never_moves_the_operating_point(evaluated):
     by_split, _ = evaluated
     validation, test = by_split["validation"], by_split["test"]
-    worse = [replace(item, outcome=replace(item.outcome, gl_account="0000")) for item in test]
+    worse = [replace(item, errors=["gl_account"]) for item in test]
     assert (
         summarize(validation, test)["operating_point"]
         == summarize(validation, worse)["operating_point"]
     )
 
 
-def test_sweep_agrees_with_the_rules_engine(evaluated):
+def test_sweep_on_stored_results_matches_a_full_rules_run(evaluated):
     validation = evaluated[0]["validation"]
     points = {(p["extract_threshold"], p["gl_threshold"]): p for p in sweep(validation)}
     for gl_threshold in (0.0, 0.5, 0.9):
@@ -119,7 +117,7 @@ def test_sweep_agrees_with_the_rules_engine(evaluated):
                 extract_threshold=EXTRACT_THRESHOLDS[0],
                 gl_threshold=gl_threshold,
             )
-            _, decision = decide(item.outcome.invoice, context, item.outcome.extraction_reasons)
+            _, decision = engine.run(item.outcome.invoice, context)
             booked += decision.kind == "AUTO_BOOK"
         assert points[(EXTRACT_THRESHOLDS[0], gl_threshold)]["auto_booked"] == booked
 

@@ -30,6 +30,10 @@ class Field(BaseModel, Generic[T]):
     confidence: float = pydantic.Field(default=1.0, ge=0.0, le=1.0)
 
 
+def value_of(optional: Field | None):
+    return None if optional is None else optional.value
+
+
 class Address(BaseModel):
     street: str | None = None
     city: str | None = None
@@ -161,5 +165,6 @@ class RuleContext:
     prior_invoices: list[PriorInvoice] = field(default_factory=list)
     validation: ValidationResult | None = None
     gl_probability: float | None = None
+    extraction_reasons: list[str] = field(default_factory=list)
     extract_threshold: float = 0.9
     gl_threshold: float = 0.9

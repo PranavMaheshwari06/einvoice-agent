@@ -1,8 +1,5 @@
-import json
-from datetime import date
 from decimal import Decimal
 from io import BytesIO
-from pathlib import Path
 
 import pytest
 from pypdf import PdfReader
@@ -13,32 +10,25 @@ from einvoice.parsing.detect import detect_format
 from einvoice.parsing.ubl import parse_ubl
 from einvoice.parsing.zugferd import embedded_invoice_xml, parse_zugferd
 from einvoice.rules import engine
-from einvoice.synth.generate import PROBLEMS, generate, read_master_data
+from einvoice.synth.generate import (
+    PROBLEMS,
+    generate,
+    prior_invoice,
+    read_gold,
+    read_master_data,
+)
 
-COUNT = 150
 PARSERS = {"cii": parse_cii, "ubl": parse_ubl, "zugferd_pdf": parse_zugferd}
 
 
-def read_gold(directory: Path) -> list[dict]:
-    lines = (directory / "gold.jsonl").read_text(encoding="utf-8").splitlines()
-    return [json.loads(line) for line in lines]
-
-
 @pytest.fixture(scope="module")
-def synth_dir(tmp_path_factory) -> Path:
-    directory = tmp_path_factory.mktemp("synth")
-    generate(seed=1, out=directory, count=COUNT)
-    return directory
+def gold(gold_dir) -> list[dict]:
+    return read_gold(gold_dir)
 
 
-@pytest.fixture(scope="module")
-def gold(synth_dir) -> list[dict]:
-    return read_gold(synth_dir)
-
-
-def test_every_file_is_detected_as_its_gold_format(synth_dir, gold):
+def test_every_file_is_detected_as_its_gold_format(gold_dir, gold):
     for record in gold:
-        assert detect_format((synth_dir / record["file"]).read_bytes()) == record["format"]
+        assert detect_format((gold_dir / record["file"]).read_bytes()) == record["format"]
 
 
 def test_all_formats_and_all_problems_occur(gold):
@@ -46,12 +36,12 @@ def test_all_formats_and_all_problems_occur(gold):
     assert {record["problem"] for record in gold} - {None} == set(PROBLEMS)
 
 
-def test_structured_invoices_parse_to_gold(synth_dir, gold):
+def test_structured_invoices_parse_to_gold(gold_dir, gold):
     parsed = 0
     for record in gold:
         if record["format"] not in PARSERS:
             continue
-        invoice = PARSERS[record["format"]]((synth_dir / record["file"]).read_bytes())
+        invoice = PARSERS[record["format"]]((gold_dir / record["file"]).read_bytes())
         assert invoice.number.value == record["number"]
         assert invoice.seller_name.value == record["vendor_name"]
         assert invoice.issue_date.value.isoformat() == record["issue_date"]
@@ -66,15 +56,15 @@ def test_structured_invoices_parse_to_gold(synth_dir, gold):
     assert parsed > 50
 
 
-def test_rules_flag_exactly_the_labelled_problems(synth_dir, gold):
-    vendors, orders = read_master_data(synth_dir)
+def test_rules_flag_exactly_the_labelled_problems(gold_dir, gold):
+    vendors, orders = read_master_data(gold_dir)
     vendor_by_vat_id = {vendor.vat_id: vendor for vendor in vendors}
     order_by_number = {order.po_number: order for order in orders}
     prior: list[PriorInvoice] = []
     checked = 0
     for record in gold:
         if record["format"] in PARSERS:
-            invoice = PARSERS[record["format"]]((synth_dir / record["file"]).read_bytes())
+            invoice = PARSERS[record["format"]]((gold_dir / record["file"]).read_bytes())
             context = RuleContext(
                 vendor=vendor_by_vat_id.get(record["vendor_vat_id"]),
                 purchase_order=order_by_number.get(record["po_number"]),
@@ -87,17 +77,7 @@ def test_rules_flag_exactly_the_labelled_problems(synth_dir, gold):
             assert (decision.kind == "REVIEW") == record["must_review"], record["id"]
             checked += 1
         # Every earlier invoice counts as received, whatever its format.
-        prior.append(
-            PriorInvoice(
-                seller_vat_id=None
-                if record["problem"] == "missing_vat_id"
-                else record["vendor_vat_id"],
-                seller_name=record["vendor_name"],
-                number=record["number"],
-                gross_total=Decimal(record["gross_total"]),
-                issue_date=date.fromisoformat(record["issue_date"]),
-            )
-        )
+        prior.append(prior_invoice(record))
     assert checked > 50
 
 

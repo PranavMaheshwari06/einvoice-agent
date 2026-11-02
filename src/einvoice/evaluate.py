@@ -5,52 +5,46 @@ import logging
 from dataclasses import dataclass, replace
 from datetime import date
 from decimal import Decimal
+from functools import partial
 from pathlib import Path
 
 import matplotlib
-import numpy as np
 
 from einvoice.models import (
     STRUCTURED_FORMATS,
-    Field,
     Invoice,
     PriorInvoice,
     PurchaseOrder,
     RuleContext,
     Vendor,
+    value_of,
 )
-from einvoice.pipeline import Complete, Outcome, Suggest, Validate, decide, process
-from einvoice.synth.generate import read_gold, read_master_data
-
-matplotlib.use("Agg")
-from matplotlib import pyplot as plt  # noqa: E402
+from einvoice.pipeline import Complete, Outcome, Suggest, Validate, process
+from einvoice.rules import engine
+from einvoice.synth.generate import prior_invoice, read_gold, read_master_data
 
 logger = logging.getLogger(__name__)
 
 EXTRACT_THRESHOLDS = (0.5, 0.7, 0.8, 0.9, 0.95, 0.99)
 GL_THRESHOLDS = tuple(round(step / 100, 2) for step in range(101))
-GL_REASON = "LOW_GL_CONFIDENCE"
 
 
 @dataclass(frozen=True)
 class Evaluated:
     record: dict
     outcome: Outcome
-
-
-def _value(field: Field | None):
-    return None if field is None else field.value
+    errors: list[str]
 
 
 def booking_errors(invoice: Invoice, gl_account: str | None, record: dict) -> list[str]:
     """What makes an automatic booking wrong (SPEC section 2); empty means it was right."""
     stated = {
-        "vendor": _value(invoice.seller_vat_id),
-        "net": _value(invoice.tax_exclusive_total),
-        "vat": _value(invoice.vat_total),
-        "gross": _value(invoice.gross_total),
+        "vendor": value_of(invoice.seller_vat_id),
+        "net": value_of(invoice.tax_exclusive_total),
+        "vat": value_of(invoice.vat_total),
+        "gross": value_of(invoice.gross_total),
         "gl_account": gl_account,
-        "due_date": _value(invoice.due_date),
+        "due_date": value_of(invoice.due_date),
     }
     gold = {
         "vendor": record["vendor_vat_id"],
@@ -64,29 +58,18 @@ def booking_errors(invoice: Invoice, gl_account: str | None, record: dict) -> li
     return errors + (["must_review"] if record["must_review"] else [])
 
 
-def _prior(record: dict) -> PriorInvoice:
-    return PriorInvoice(
-        seller_vat_id=None if record["problem"] == "missing_vat_id" else record["vendor_vat_id"],
-        seller_name=record["vendor_name"],
-        number=record["number"],
-        gross_total=Decimal(record["gross_total"]),
-        issue_date=date.fromisoformat(record["issue_date"]),
-    )
-
-
-def _context_for(
-    vendors: dict[str, Vendor], orders: dict[str, PurchaseOrder], prior: list[PriorInvoice]
-):
+def _context(
+    vendors: dict[str, Vendor],
+    orders: dict[str, PurchaseOrder],
+    prior: list[PriorInvoice],
+    invoice: Invoice,
+) -> RuleContext:
     """Master data is looked up by what the invoice states, as it would be in production."""
-
-    def context_for(invoice: Invoice) -> RuleContext:
-        return RuleContext(
-            vendor=vendors.get(_value(invoice.seller_vat_id)),
-            purchase_order=orders.get(_value(invoice.po_number)),
-            prior_invoices=prior,
-        )
-
-    return context_for
+    return RuleContext(
+        vendor=vendors.get(value_of(invoice.seller_vat_id)),
+        purchase_order=orders.get(value_of(invoice.po_number)),
+        prior_invoices=prior,
+    )
 
 
 def _replay(replay_dir: Path, record: dict) -> Complete | None:
@@ -97,63 +80,59 @@ def _replay(replay_dir: Path, record: dict) -> Complete | None:
     return lambda _prompt: response
 
 
+def _no_model(_prompt: str) -> str:
+    raise RuntimeError("structured input never reaches the language model")
+
+
 def run_gold(
     directory: Path, validate: Validate, suggest: Suggest, replay_dir: Path
 ) -> tuple[dict[str, list[Evaluated]], dict[str, int]]:
     """Process validation and test invoices in issue order; every earlier invoice is a prior one."""
-    gold = read_gold(directory)
     vendors, orders = read_master_data(directory)
     vendor_by_vat_id = {vendor.vat_id: vendor for vendor in vendors}
     order_by_number = {order.po_number: order for order in orders}
     evaluated: dict[str, list[Evaluated]] = {"validation": [], "test": []}
     skipped = {"validation": 0, "test": 0}
     prior: list[PriorInvoice] = []
-    for record in gold:
+    for record in read_gold(directory):
         split = record["split"]
-        if split in evaluated:
-            complete = _replay(replay_dir, record)
-            if record["format"] not in STRUCTURED_FORMATS and complete is None:
-                skipped[split] += 1
-            else:
-                context_for = _context_for(vendor_by_vat_id, order_by_number, list(prior))
-                content = (directory / record["file"]).read_bytes()
-                outcome = process(content, context_for, validate, complete, suggest)
-                evaluated[split].append(Evaluated(record, outcome))
-        prior.append(_prior(record))
+        complete = _replay(replay_dir, record)
+        structured = record["format"] in STRUCTURED_FORMATS
+        if split not in evaluated:
+            pass
+        elif not structured and complete is None:
+            skipped[split] += 1
+        else:
+            context_for = partial(_context, vendor_by_vat_id, order_by_number, list(prior))
+            content = (directory / record["file"]).read_bytes()
+            outcome = process(content, context_for, validate, complete or _no_model, suggest)
+            errors = booking_errors(outcome.invoice, outcome.gl_account, record)
+            evaluated[split].append(Evaluated(record, outcome, errors))
+        prior.append(prior_invoice(record))
     return evaluated, skipped
 
 
-def _gate_inputs(evaluated: list[Evaluated], extract_threshold: float):
-    """Per invoice: blocked by anything but the GL gate, the GL probability, and whether wrong."""
-    blocked, probability, wrong = [], [], []
-    for item in evaluated:
-        outcome = item.outcome
-        context = replace(outcome.context, extract_threshold=extract_threshold)
-        _, decision = decide(outcome.invoice, context, outcome.extraction_reasons)
-        blocked.append(any(reason != GL_REASON for reason in decision.reasons))
-        probability.append(-1.0 if context.gl_probability is None else context.gl_probability)
-        wrong.append(bool(booking_errors(outcome.invoice, outcome.gl_account, item.record)))
-    return np.array(blocked), np.array(probability), np.array(wrong)
+def _books(item: Evaluated, extract_threshold: float, gl_threshold: float) -> bool:
+    context = replace(
+        item.outcome.context, extract_threshold=extract_threshold, gl_threshold=gl_threshold
+    )
+    decision = engine.decide(item.outcome.invoice, context, item.outcome.results)
+    return decision.kind == "AUTO_BOOK"
 
 
 def sweep(evaluated: list[Evaluated]) -> list[dict]:
-    """Coverage and wrong auto-bookings for each threshold pair.
-
-    The GL gate is the last check of `engine.run` (probability below threshold -> review), so
-    the rules run once per extraction threshold and the GL threshold is applied here.
-    """
+    """Coverage and wrong auto-bookings for each threshold pair, decided by the rules engine."""
     points = []
     for extract_threshold in EXTRACT_THRESHOLDS:
-        blocked, probability, wrong = _gate_inputs(evaluated, extract_threshold)
         for gl_threshold in GL_THRESHOLDS:
-            booked = ~blocked & (probability >= gl_threshold)
+            booked = [item for item in evaluated if _books(item, extract_threshold, gl_threshold)]
             points.append(
                 {
                     "extract_threshold": extract_threshold,
                     "gl_threshold": gl_threshold,
-                    "auto_booked": int(booked.sum()),
-                    "wrong": int((booked & wrong).sum()),
-                    "coverage": float(booked.mean()),
+                    "auto_booked": len(booked),
+                    "wrong": sum(bool(item.errors) for item in booked),
+                    "coverage": len(booked) / len(evaluated),
                 }
             )
     return points
@@ -202,21 +181,18 @@ def summarize(validation: list[Evaluated], test: list[Evaluated]) -> dict:
 
 
 def _wrong_bookings(evaluated: list[Evaluated], chosen: dict) -> list[dict]:
-    rows = []
-    for item in evaluated:
-        context = replace(
-            item.outcome.context,
-            extract_threshold=chosen["extract_threshold"],
-            gl_threshold=chosen["gl_threshold"],
-        )
-        _, decision = decide(item.outcome.invoice, context, item.outcome.extraction_reasons)
-        errors = booking_errors(item.outcome.invoice, item.outcome.gl_account, item.record)
-        if decision.kind == "AUTO_BOOK" and errors:
-            rows.append({"id": item.record["id"], "errors": errors})
-    return rows
+    thresholds = (chosen["extract_threshold"], chosen["gl_threshold"])
+    return [
+        {"id": item.record["id"], "errors": item.errors}
+        for item in evaluated
+        if item.errors and _books(item, *thresholds)
+    ]
 
 
 def plot(curve: list[dict], test_point: dict | None, path: Path) -> None:
+    matplotlib.use("Agg")
+    from matplotlib import pyplot as plt
+
     figure, axes = plt.subplots(figsize=(6, 4))
     axes.plot(
         [point["coverage"] for point in curve],

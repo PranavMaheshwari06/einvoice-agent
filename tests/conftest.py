@@ -10,6 +10,8 @@ import numpy as np
 import pytest
 from sklearn.feature_extraction.text import HashingVectorizer
 
+from einvoice.ml.coding import calibrate, tfidf_model
+from einvoice.ml.train import split_lines
 from einvoice.models import (
     Evidence,
     Field,
@@ -21,7 +23,7 @@ from einvoice.models import (
     Vendor,
 )
 from einvoice.parsing.zugferd import parse_zugferd
-from einvoice.synth.generate import generate
+from einvoice.synth.generate import generate, read_gold
 
 FIXTURES = Path(__file__).parent / "fixtures"
 MUSTANG_PDF = FIXTURES / "corpus" / "MustangGnuaccountingBeispielRE-20201121_508.pdf"
@@ -95,3 +97,10 @@ def gold_dir(tmp_path_factory) -> Path:
     directory = tmp_path_factory.mktemp("synth_small")
     generate(seed=1, out=directory, count=SYNTH_COUNT)
     return directory
+
+
+@pytest.fixture(scope="session")
+def gl_model(gold_dir):
+    """A calibrated TF-IDF model trained on the train split of the small gold set."""
+    train = split_lines(read_gold(gold_dir))["train"]
+    return calibrate(tfidf_model(), train.texts, train.accounts, train.sellers)

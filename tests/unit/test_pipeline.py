@@ -80,7 +80,7 @@ def test_planted_wrong_quote_adds_the_extraction_reason():
         lambda _prompt: json.dumps(planted),
         lambda _invoice: ("4930", 0.99),
     )
-    assert outcome.extraction_reasons == ["EVIDENCE_NOT_FOUND"]
+    assert outcome.context.extraction_reasons == ["EVIDENCE_NOT_FOUND"]
     assert "EVIDENCE_NOT_FOUND" in outcome.decision.reasons
 
 
