@@ -131,7 +131,6 @@ covers it, and deleting the line.
 - [open: L1 owner] "Reopen in Container" in VS Code was not clicked; R0a checked `.devcontainer/devcontainer.json` with the devcontainer CLI (`up`, `exec`), which reads the same file.
 - [open: R0b] `rules/legal.py`: `SMALL_AMOUNT_LIMIT` = 250 EUR (§33 UStDV) not checked against the primary source here.
 - [open: R0b] `synth/generate.py`: ZUGFeRD PDFs are reportlab PDFs with `drafthorse.pdf.attach_xml`, not PDF/A-3; pypdf reads them, a strict PDF/A or Mustang check may reject them.
-- [open: R0b] `synth/render.py`: the OCR legibility of the generated scans (rotation up to 1.5 degrees, noise) is unchecked; the A3 OCR tests skip without tesseract.
 - [open: R0b] `data/rules/skr03_subset.csv`: account numbers and names not checked against an official SKR03 list.
 - [open: A5] `extraction/prompts/extract_de.txt`: never sent to a real model; whether it yields valid JSON with exact quotes (and no code fences) is unknown. Replay fixtures are hand-written, not recorded.
 - [open: A4] `ml/coding.py::E5Encoder`: `SentenceTransformer("intfloat/multilingual-e5-small").encode(..., normalize_embeddings=True)` never ran here (no HuggingFace access, sentence-transformers not installed); the "query: " prefix is from the model card. Run `einvoice train` with the real model.
