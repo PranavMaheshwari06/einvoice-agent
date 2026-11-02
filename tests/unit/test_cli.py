@@ -1,6 +1,13 @@
+import json
+
 import pytest
 
+from conftest import FIXTURES
 from einvoice.cli import build_parser, main
+from einvoice.ml.coding import calibrate, tfidf_model
+from einvoice.models import RuleViolation, ValidationResult
+from einvoice.parsing.detect import detect_format
+from einvoice.synth.generate import read_gold
 
 
 def test_help_lists_subcommands(capsys):
@@ -83,3 +90,55 @@ def test_db_load_passes_the_directory_to_the_loader(monkeypatch, tmp_path, capsy
 
     assert loaded == [tmp_path]
     assert f"loaded master data from {tmp_path}" in capsys.readouterr().out
+
+
+def test_model_and_eval_commands_are_listed(capsys):
+    with pytest.raises(SystemExit):
+        main(["--help"])
+    out = capsys.readouterr().out
+    assert all(name in out for name in ("train", "eval", "convert"))
+
+
+UBL = FIXTURES / "xrechnung" / "01.01a-INVOICE_ubl.xml"
+
+
+def _kosit(monkeypatch, accepted: bool) -> None:
+    from einvoice.validation import kosit
+
+    errors = [] if accepted else [RuleViolation(rule_id="BR-DE-1", level="error", message="x")]
+    result = ValidationResult(accepted=accepted, errors=errors)
+    monkeypatch.setattr(kosit, "validate", lambda _xml, _url: result)
+
+
+def test_convert_writes_cii_and_reports_kosit(monkeypatch, tmp_path, capsys):
+    _kosit(monkeypatch, accepted=True)
+    out = tmp_path / "out.xml"
+    main(["convert", str(UBL), "--out", str(out)])
+    assert detect_format(out.read_bytes()) == "cii"
+    assert "KoSIT accepted=True" in capsys.readouterr().out
+
+
+def test_convert_fails_when_kosit_rejects(monkeypatch, tmp_path, capsys):
+    _kosit(monkeypatch, accepted=False)
+    with pytest.raises(SystemExit) as exit_info:
+        main(["convert", str(UBL), "--out", str(tmp_path / "out.xml")])
+    assert exit_info.value.code == 1
+    assert "BR-DE-1" in capsys.readouterr().out
+
+
+def test_convert_refuses_a_plain_pdf(tmp_path):
+    with pytest.raises(SystemExit, match="convert reads UBL, CII or ZUGFeRD"):
+        main(["convert", str(FIXTURES / "synth" / "inv_00001.pdf"), "--out", str(tmp_path / "x")])
+
+
+def test_eval_with_fixtures_says_kosit_was_not_called(monkeypatch, gold_dir, tmp_path):
+    from einvoice.ml import train
+
+    lines = train.split_lines(read_gold(gold_dir))["train"]
+    model = calibrate(tfidf_model(), lines.texts, lines.accounts, lines.sellers)
+    monkeypatch.setattr(train, "load_champion", lambda _uri: (model, "tfidf"))
+    monkeypatch.chdir(tmp_path)
+    main(["eval", "--dir", str(gold_dir), "--fixtures"])
+    metrics = json.loads((tmp_path / "reports" / "metrics.json").read_text())
+    assert metrics["kosit"].startswith("not called (--fixtures)")
+    assert metrics["encoder"] == "tfidf"
