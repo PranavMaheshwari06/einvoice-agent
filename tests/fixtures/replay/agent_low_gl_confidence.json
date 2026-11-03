@@ -1,0 +1,42 @@
+{
+ "case": "low_gl_confidence",
+ "source": "hand-written",
+ "responses": [
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "get_invoice",
+     "args": {
+      "invoice_id": 1024
+     },
+     "id": "call_1"
+    }
+   ]
+  },
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "get_vendor_history",
+     "args": {
+      "vat_id": "DE100000001"
+     },
+     "id": "call_2"
+    },
+    {
+     "name": "search_rules",
+     "args": {
+      "query": "Kontierung Sachkonto Schwellenwert automatische Buchung",
+      "k": 4
+     },
+     "id": "call_3"
+    }
+   ]
+  },
+  {
+   "content": "{\"action\": \"approve_booking\", \"explanation\": \"All checks pass; only the account suggestion was below the threshold. The vendor's earlier invoices for toner were booked to 4930 (Bürobedarf), which fits this invoice.\", \"citations\": [\"AP-automatic-booking\"], \"vendor_email_de\": null}",
+   "tool_calls": []
+  }
+ ]
+}

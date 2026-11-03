@@ -1,0 +1,35 @@
+{
+ "case": "kosit_br_de_16",
+ "source": "hand-written",
+ "responses": [
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "get_invoice",
+     "args": {
+      "invoice_id": 1023
+     },
+     "id": "call_1"
+    }
+   ]
+  },
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "search_rules",
+     "args": {
+      "query": "Seller VAT identifier BT-31 fehlt",
+      "k": 4
+     },
+     "id": "call_2"
+    }
+   ]
+  },
+  {
+   "content": "{\"action\": \"request_correction\", \"explanation\": \"Neither seller VAT id (BT-31) nor tax registration (BT-32) is given, so the validator rejected the file and § 14 Abs. 4 UStG is not met.\", \"citations\": [\"BR-DE-16\", \"UStG-14-4\"], \"vendor_email_de\": \"Sehr geehrte Damen und Herren,\\n\\nzu Ihrer Rechnung RE-2026-0412 vom 14.09.2026 bitten wir um eine korrigierte Rechnung: Es fehlen Ihre USt-IdNr. (BT-31) oder Steuernummer (BT-32).\\n\\nMit freundlichen Grüßen\\nKreditorenbuchhaltung\"}",
+   "tool_calls": []
+  }
+ ]
+}

@@ -1,4 +1,5 @@
 import json
+import shutil
 from dataclasses import replace
 from functools import partial
 
@@ -10,6 +11,8 @@ from einvoice.evaluate import (
     booking_errors,
     evaluate,
     operating_point,
+    recording,
+    replay,
     rule_of_three,
     run_gold,
     summarize,
@@ -32,7 +35,7 @@ def suggest(gl_model):
 @pytest.fixture(scope="module")
 def evaluated(gold_dir, suggest, tmp_path_factory):
     replay_dir = tmp_path_factory.mktemp("no_replay")
-    return run_gold(gold_dir, lambda _xml: ACCEPT, suggest, replay_dir)
+    return run_gold(gold_dir, lambda _xml: ACCEPT, suggest, partial(replay, replay_dir))
 
 
 def _structured(gold_dir, predicate):
@@ -142,9 +145,9 @@ def test_pdfs_and_scans_without_replay_are_skipped_and_counted(gold_dir, evaluat
 
 def test_a_replay_response_lets_a_pdf_through(gold_dir, suggest, tmp_path):
     record = next(r for r in read_gold(gold_dir) if r["format"] == "pdf" and r["split"] == "test")
-    replay = json.loads((FIXTURES / "replay" / "extract_synth_inv_00001.json").read_text())
-    (tmp_path / f"{record['id']}.json").write_text(json.dumps(replay))
-    by_split, skipped = run_gold(gold_dir, lambda _xml: ACCEPT, suggest, tmp_path)
+    fixture = json.loads((FIXTURES / "replay" / "extract_synth_inv_00001.json").read_text())
+    (tmp_path / f"{record['id']}.json").write_text(json.dumps(fixture))
+    by_split, skipped = run_gold(gold_dir, lambda _xml: ACCEPT, suggest, partial(replay, tmp_path))
     assert record["id"] in {item.record["id"] for item in by_split["test"]}
 
 
@@ -155,7 +158,8 @@ def test_evaluate_writes_metrics_and_plot(gold_dir, suggest, tmp_path):
         "not called (test)",
         suggest,
         "tfidf",
-        tmp_path / "no_replay",
+        partial(replay, tmp_path / "no_replay"),
+        "replay from no_replay (test)",
         tmp_path / "reports",
     )
     written = json.loads((tmp_path / "reports" / "metrics.json").read_text())
@@ -163,6 +167,7 @@ def test_evaluate_writes_metrics_and_plot(gold_dir, suggest, tmp_path):
     assert (tmp_path / "reports" / "risk_coverage.png").stat().st_size > 0
     assert metrics["kosit"] == "not called (test)"
     assert metrics["encoder"] == "tfidf"
+    assert metrics["extraction"] == "replay from no_replay (test)"
     assert metrics["thresholds_chosen_on"] == "validation"
     assert all(0 <= point["risk"] <= 1 for point in metrics["test_curve"])
 
@@ -200,4 +205,41 @@ def test_a_split_without_processed_invoices_is_refused(gold_dir, suggest, tmp_pa
         lambda *_args: ({"validation": [], "test": []}, {"validation": 3, "test": 0}),
     )
     with pytest.raises(ValueError, match="no validation invoice could be processed"):
-        evaluate(gold_dir, lambda _xml: ACCEPT, "x", suggest, "tfidf", tmp_path, tmp_path / "r")
+        evaluate(gold_dir, lambda _xml: ACCEPT, "x", suggest, "tfidf", None, "x", tmp_path / "r")
+
+
+def test_recording_saves_each_live_reply_in_the_replay_format(gold_dir, suggest, tmp_path):
+    directory = tmp_path / "no_scans"
+    shutil.copytree(gold_dir, directory)
+    # Scans need tesseract, which a cloud session lacks; PDFs exercise the same recording path.
+    records = [r for r in read_gold(gold_dir) if r["format"] != "scan"]
+    (directory / "gold.jsonl").write_text("".join(json.dumps(r) + "\n" for r in records))
+    replay_dir = tmp_path / "replay"
+
+    live = partial(recording, lambda _prompt: "{}", replay_dir)
+    recorded, _ = run_gold(directory, lambda _xml: ACCEPT, suggest, live)
+    replayed, skipped = run_gold(
+        directory, lambda _xml: ACCEPT, suggest, partial(replay, replay_dir)
+    )
+
+    pdfs = [r for r in records if r["format"] == "pdf" and r["split"] in ("validation", "test")]
+    assert pdfs
+    assert sorted(path.stem for path in replay_dir.iterdir()) == sorted(r["id"] for r in pdfs)
+    fixture = json.loads((replay_dir / f"{pdfs[0]['id']}.json").read_text())
+    assert fixture == {"pdf": pdfs[0]["file"], "content": {}}
+    assert skipped == {"validation": 0, "test": 0}
+    assert len(replayed["test"]) == len(recorded["test"])
+
+
+def test_a_reply_that_is_not_json_is_passed_on_but_not_recorded(tmp_path):
+    record = {"id": "inv_00007", "file": "invoices/inv_00007.pdf"}
+    replies = iter(["```json\n{}\n```", "{}"])
+    complete = recording(lambda _prompt: next(replies), tmp_path, record)
+
+    assert complete("first") == "```json\n{}\n```"
+    assert not (tmp_path / "inv_00007.json").exists()
+    complete("retry")
+    assert json.loads((tmp_path / "inv_00007.json").read_text()) == {
+        "pdf": "invoices/inv_00007.pdf",
+        "content": {},
+    }

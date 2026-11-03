@@ -1,0 +1,42 @@
+{
+ "case": "duplicate_and_bank_change",
+ "source": "hand-written",
+ "responses": [
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "get_invoice",
+     "args": {
+      "invoice_id": 1029
+     },
+     "id": "call_1"
+    }
+   ]
+  },
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "get_vendor_history",
+     "args": {
+      "vat_id": "DE100000001"
+     },
+     "id": "call_2"
+    },
+    {
+     "name": "search_rules",
+     "args": {
+      "query": "doppelte Rechnung und geänderte Bankverbindung",
+      "k": 4
+     },
+     "id": "call_3"
+    }
+   ]
+  },
+  {
+   "content": "{\"action\": \"reject\", \"explanation\": \"The invoice repeats RE-2026-0412 and names a different IBAN than the master record; it is a duplicate and must not be paid, and the bank change needs a person's check.\", \"citations\": [\"AP-duplicates\", \"AP-bank-details\"], \"vendor_email_de\": null}",
+   "tool_calls": []
+  }
+ ]
+}

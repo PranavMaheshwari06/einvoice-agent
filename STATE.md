@@ -2,23 +2,24 @@
 
 Read this first in every session. Update it before every commit.
 
-Current phase: **A5 build** (session S3 next). A0 to A4 are built; R0b cloud part is done.
+Current phase: **A6a UI design** (session S4 next). A0 to A5 are built; R0a is live; R0b cloud
+part is done. The A5 live part (provider probe, recording, owner review) waits for the laptop.
 Rules: `CLAUDE.md`. Design: `docs/SPEC.md`. History: `docs/PHASE_LOG.md`.
 
 ## Next session
-Branch: `pranav/a5-agent` (create it from `pranav/a4-models-eval`)
-Session: S3, phase A5 build, where: cloud, model: Opus
-First message: "Start S3 from STATE.md: build A5 (llm, agent, MCP tools, RAG, guardrails, agent evals) as listed in the brief, then hand off to S4."
+Branch: `pranav/a6a-ui-design` (create it from `pranav/a5-agent`; S3 is not merged into `main`)
+Session: S4, phase A6a UI design, where: cloud, model: Opus
+First message: "Start S4 from STATE.md: design A6a (UI brief, user flows, clickable prototype, German/English string list), then stop for the owner's review."
 Brief:
-- Read first: "A4 findings" below (calibration result to discuss with the owner), SPEC 3.7, 3.8, 8.
-- Modules (SPEC 3.7, 3.8): `llm.py` (`chat_model(settings)`, `ReplayChatModel`), `agent/mcp_server.py` (read-only tools), `agent/rag.py` (chunks with source ids, `min_similarity`), `agent/graph.py` (agent <-> tools, `finalize` into `AgentProposal`), `evals/agent_cases.yaml` (about 30 cases) with one replay fixture per case.
-- `extract_invoice` takes `complete(prompt) -> str`; wrap the chat model in a lambda. `pipeline.process` takes `complete` as well; `evaluate.run_gold` reads replay responses from `<dir>/replay/<id>.json` as `{pdf, content}`; `einvoice eval --record` should write that format.
-- Guardrails as tests: no booking tool exists, an unknown citation escalates (`UNSUPPORTED_EXPLANATION`), empty retrieval escalates (`INSUFFICIENT_EVIDENCE`), every citation came from a tool call in the run.
-- RAG needs Postgres and the e5 model: unit tests bind the tool functions directly and stub the encoder (`tests/conftest.py::stub_encode`); `E5Encoder` in `ml/coding.py` is the encoder to reuse.
-- Tick `A5 build` only. The provider probe, recording and the owner's review of recorded fixtures are the A5 live part and its STOP.
-Do not touch: Dockerfile, Compose, devcontainer, k8s, Terraform, CI files; A6 code (API, UI, persistence).
+- Read first: SPEC 3.12 (screens), 8 (A6a row and its STOP), and `docs/notes/agent.md` for what a review shows (proposal, action, citations, vendor email, guardrail reasons).
+- Produce: a short UI brief, the user flows (inbox, invoice view with evidence next to the fields, check results, review queue with Approve / Correct / Reject), a clickable prototype with fixed sample data (no API), and one German/English string list.
+- The stack is open: the SPEC names FastAPI + Jinja2 + HTMX as the candidate. Recommend one with a reason; adding a dependency needs a decision-log line.
+- STOP when the prototype exists: the owner approves or edits it and may supply a template. Do not start A6b.
+Do not touch: Dockerfile, Compose, devcontainer, k8s, Terraform, CI files; A5 agent code except to fix a bug the prototype exposes; A6b API and persistence.
 
-Also unblocked since R0a (L1, laptop): R0b live on `pranav/r0b-live`, started from `pranav/r0-dev-environment`. Commands now run in the dev container (`make up`, then Reopen in Container, or `docker compose -f deploy/compose.yaml exec dev <cmd>`). First message: "Start L1 from STATE.md: close the R0b UNVERIFIED lines (Postgres migrations and loading, KoSIT over data/synth, real daemon report fixture), then stop."
+Also open on the laptop (L1):
+- R0b live on `pranav/r0b-live`: "Start L1 from STATE.md: close the R0b UNVERIFIED lines (Postgres migrations and loading, KoSIT over data/synth, real daemon report fixture), then stop."
+- A5 live on `pranav/a5-live`, started from `pranav/a5-agent`, after R0b and A4 live: "Start A5 live from STATE.md: run the provider probe, index the rules, record extraction and agent fixtures, write reports/agent_eval.json, then stop for the owner's review." Steps: `make fetch`; `einvoice db migrate`, `einvoice db index`; set `MIN_SIMILARITY` from a few relevant and unrelated queries; probe = `einvoice agent-eval` with each candidate `LLM_PROVIDER` (Gemini through `OPENAI_BASE_URL` first, ask before a paid one); `einvoice agent-eval --record` and `einvoice eval --record` with the chosen model; the owner reviews the recorded fixtures and the extraction accuracy (STOP).
 
 ## Sessions
 One session per row. The branch of a session starts from the tip of the previous one unless
@@ -28,7 +29,7 @@ that one is already merged into `main`.
 |---|---|---|---|
 | S1 (done) | instruction files, R0b cloud fixes | cloud, Sonnet | `pranav/claude-code-setup` |
 | S2 | A4 build | cloud, Opus | `pranav/a4-models-eval` |
-| S3 | A5 build | cloud, Opus | `pranav/a5-agent` |
+| S3 (done) | A5 build | cloud, Opus | `pranav/a5-agent` |
 | S4 | A6a UI design | cloud, Opus | `pranav/a6a-ui-design` |
 | S5 | A6b build, A7 build | cloud, Sonnet | `pranav/a6b-api-ui` |
 | L1 | R0a, then live passes R0b, A4, A5, A6b, A7 | laptop dev container, Sonnet then Opus | `pranav/r0-dev-environment`, then `pranav/<phase>-live` |
@@ -48,7 +49,7 @@ VS Code on the laptop.
 - [x] R0a Environment (dev container, Dockerfile, Compose, lockfile): [x] build, [x] live (L1)
 - [ ] R0b Catch-up: [x] build (cloud, S1), [ ] live (laptop)
 - [ ] A4 Models + eval: [x] build (S2), [ ] live
-- [ ] A5 Agent: [ ] build (S3), [ ] live (provider probe, recording; STOP)
+- [ ] A5 Agent: [x] build (S3), [ ] live (provider probe, recording; STOP)
 - [ ] A6a UI design: [ ] prototype (S4; STOP)
 - [ ] A6b API + UI: [ ] build (S5), [ ] live (STOP)
 - [ ] A7 Monitoring: [ ] build (S5), [ ] live
@@ -115,6 +116,18 @@ One line each: date, decision, reason.
 - 2026-11-02: R0a: all three services sit in the Compose profile `core`, ports are bound to 127.0.0.1, the Postgres image is `pgvector/pgvector:pg16`, and `devcontainer.json` names the three services in `runServices`. `make install` is removed (the lock replaces it); `up`, `down` and `lock` run on the host, the other targets inside the container.
 - 2026-11-02: R0a: the validator image pins jar v1.6.3 and configuration v2026-08-31 (XRechnung 3.0.2) as build ARGs, the same versions as `DATA_SOURCES.md`; Temurin 21 JRE because the configuration docs ask for Java 11 or later. `ADD --chmod=644` because a downloaded file is root-only otherwise and the daemon runs as a system user.
 - 2026-11-02: `models.value_of` and `ustg14.compact_vat_id` are shared helpers. Reason: the field-unwrap and VAT-id compaction had several copies; evaluation must compare an extracted "DE 123 456 789" with the compact master-data id.
+- 2026-11-02: S3 branch `pranav/a5-agent` starts from `origin/main` (owner: A4 and R0a are merged). The cloud venv has no torch: the PyTorch CPU index is blocked here, so the lock was installed without torch and sentence-transformers; unit tests stub the encoder anyway.
+- 2026-11-02: `llm.chat_model(settings, replay_file=None)`; replay needs the file. Agent replay fixtures are `{case, source, responses: [{content, tool_calls}]}` with `source` "hand-written" or "recorded from <provider>:<model>", so a report can say where its answers came from. Extraction keeps its `{pdf, content}` format (A3, brief). `llm.complete(model, prompt)` is the `complete` extraction takes.
+- 2026-11-02: `agent/evals.py` (not named in the SPEC) runs `evals/agent_cases.yaml`; `einvoice agent-eval [--record]` writes `reports/agent_eval.json`. Each case fixes the tool answers and `search_rules` returns the case's chunks for any query, so a run depends only on the model and a recording replays identically. Baseline: escalate every invoice. PyYAML (already in the lock) is now a direct dependency of the `agent` extra for the SPEC's YAML file.
+- 2026-11-02: `einvoice db index` builds `rule_chunks` from `data/raw` and the AP policy. Reason: the RAG needs the table filled and the SPEC names no command.
+- 2026-11-02: Source ids: `UStG-14-<Absatz>`, `AP-<heading slug>`, BR-DE rule ids. BR-DE texts come from the UBL schematron of the validator configuration (39 rules incl. BR-DE-CVD-* and BR-DE-TMP-32, no BR-DEX; UBL texts are all German, CII has one English text). The schematron is copied unchanged to `tests/fixtures/kosit/`.
+- 2026-11-02: e5 prefixes for retrieval: `query: ` for queries, `passage: ` for indexed texts, confirmed in the authors' code (`microsoft/unilm`, `e5/mteb_beir_eval.py`; Hugging Face is blocked here). `E5Encoder` takes the prefix. An encoder pickled before this change has no `_prefix`; no champion is registered yet (A4 live not run), so retraining in A4 live is enough.
+- 2026-11-02: `AgentProposal` has `reasons` for the guardrail codes. A fourth code, `INVALID_PROPOSAL`, covers an answer that is not valid proposal JSON (also prose or code fences), and a run cut off after `MAX_TOOL_ROUNDS` = 6 rounds of tool calls. An overruled proposal keeps no model text, citations or email. `INSUFFICIENT_EVIDENCE` also applies when `search_rules` was never called.
+- 2026-11-02: `search_rules` returns `{"chunks": [...]}`, at most `MAX_CHUNKS` = 8. Reason: FastMCP splits a returned list into several content items, and every returned chunk becomes citable. `MIN_SIMILARITY` = 0.80 is provisional; the SPEC rule "best below the cut-off, no chunks" is applied literally.
+- 2026-11-02: `models.NotFound(LookupError)` marks a missing invoice or PO. The tool node sends only `NotFound` back to the model, because `KeyError` is a `LookupError` too and would hide programming errors. Over MCP the adapter returns every server error as a message (its default), so a database failure ends as an escalation.
+- 2026-11-02: `get_invoice` returns field values without evidence (`invoice_summary`), plus review reasons and failed checks. Reason: the canonical record with XPaths and quotes is several times larger and the agent cites rules, not fields.
+- 2026-11-02: `evaluate.run_gold` takes `complete_for(record)` (`replay` or `recording`) instead of a replay directory. `einvoice eval --record` sends PDFs and scans to `LLM_PROVIDER` and keeps the last reply that parses as JSON, so extraction's one retry still works while recording. `metrics.json` has an `extraction` field naming the source of the replies.
+- 2026-11-02: `einvoice agent-eval` builds the corpus from `data/raw` also in replay mode, although replay never reads chunk texts. Reason: the same run checks that every case's source id exists in the real sources; CI does not run the agent eval (SPEC 7 gates only `einvoice eval`).
 
 ## A4 findings (S2, cloud run on seed 1, 2000 invoices, hashing stub instead of e5, KoSIT skipped)
 Numbers are not quoted here because they come from a stubbed run outside `reports/`; rerun
@@ -144,6 +157,13 @@ covers it, and deleting the line.
 - [open: A4] `einvoice eval` without `--fixtures`: never called the live KoSIT daemon; `reports/metrics.json` and `risk_coverage.png` with live validation do not exist yet.
 - [open: A4] `einvoice convert`: the written CII never went through the live KoSIT daemon.
 - [open: A5] `evaluate.run_gold`: PDFs and scans are skipped until replay responses exist under `<dir>/replay/`; scans also need tesseract.
+
+- [open: A5] `llm.py`: the `ollama`, `openai` (Gemini through `OPENAI_BASE_URL`) and `anthropic` branches never reached a provider [cloud-built]; tool calling and the JSON answer format are unchecked. The provider probe decides the model.
+- [open: A5] `agent/prompts/review_en.txt` and the 32 fixtures `tests/fixtures/replay/agent_*.json`: written by hand, never sent to or recorded from a model [cloud-built]. Re-record with `einvoice agent-eval --record`; the owner reviews them (STOP). `reports/agent_eval.json` does not exist yet.
+- [open: A5] `agent/rag.py::ustg_chunks`: assumes the gesetze-im-internet.de XML has `norm/metadaten/enbez` = "§ 14" and one `textdaten/text/Content/P` per Absatz starting with "(n)", and no named entities that need the DTD [cloud-built]; the host is blocked here and `tests/fixtures/ustg/ustg_structure.xml` is hand-written. The UStG ids in the cases (`UStG-14-4`) are checked only then.
+- [open: A5] `agent/rag.py::store`, `nearest`: never ran against pgvector [cloud-built] (text literal with `::vector`, `<=>` as cosine distance, named parameters). `MIN_SIMILARITY` = 0.80 is a placeholder value to set from live queries; chunk lengths against e5's 512 tokens are unchecked.
+- [open: A5] `db/db.py::fetch_invoice`, `fetch_purchase_order`, `fetch_vendor_history` and the MCP tools on top: never ran against Postgres [cloud-built]; the stdio test only lists the tools. Full use needs stored invoices (A6b).
+- [open: A5] `einvoice eval --record`: never called a model [cloud-built]; the existing extraction fixtures are still hand-written (line above about `extract_de.txt`).
 
 ## Blockers
 Anything that stopped progress twice in a row, with what was tried.
