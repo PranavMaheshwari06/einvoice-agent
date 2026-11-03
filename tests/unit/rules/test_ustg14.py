@@ -66,6 +66,39 @@ def test_small_amount_invoice_needs_fewer_fields(mustang_invoice):
 
 
 @pytest.mark.parametrize(
+    ("gross_total", "expected_failures"),
+    [
+        (Decimal("250.00"), set()),
+        (
+            Decimal("250.01"),
+            {
+                "MISSING_BUYER_NAME",
+                "MISSING_BUYER_ADDRESS",
+                "MISSING_VAT_ID",
+                "MISSING_INVOICE_NUMBER",
+                "MISSING_DELIVERY_DATE",
+            },
+        ),
+    ],
+)
+def test_small_amount_relief_ends_just_above_250_euro(
+    mustang_invoice, gross_total, expected_failures
+):
+    """§33 UStDV: a total that 'nicht übersteigt' 250 EUR qualifies, one cent more does not."""
+    invoice = mustang_invoice.model_copy(
+        update={
+            "gross_total": xml_value(gross_total),
+            "buyer_name": None,
+            "buyer_address": None,
+            "number": None,
+            "seller_vat_id": None,
+            "delivery_date": None,
+        }
+    )
+    assert failed(check_mandatory_fields(invoice, RuleContext())) == expected_failures
+
+
+@pytest.mark.parametrize(
     ("vat_id", "valid"),
     [
         ("DE136695976", True),
