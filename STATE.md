@@ -2,7 +2,7 @@
 
 Read this first in every session. Update it before every commit.
 
-Current phase: **live passes on the laptop** (R0b live in progress, then A4 live, then A5 live).
+Current phase: **live passes on the laptop** (R0b live waits for the owner's merge, then A4 live, then A5 live).
 A0 to A5 are built; R0a is live. S4 (A6a UI design) is built on `pranav/a6a-ui-design`, is not
 merged, and awaits the owner's review (STOP).
 Rules: `CLAUDE.md`. Design: `docs/SPEC.md`. History: `docs/PHASE_LOG.md`.
@@ -11,7 +11,7 @@ Rules: `CLAUDE.md`. Design: `docs/SPEC.md`. History: `docs/PHASE_LOG.md`.
 Laptop (dev container), in this order. Each branch starts from the updated `main` after the
 previous pull request is merged.
 
-1. R0b live on `pranav/r0b-live` (in progress). Three UNVERIFIED lines wait for the owner's decision: §33 UStDV, PDF/A, SKR03. First message: "Start L1 from STATE.md: close the R0b UNVERIFIED lines (Postgres migrations and loading, KoSIT over data/synth, real daemon report fixture), then stop."
+1. R0b live on `pranav/r0b-live`: done except the PDF/A line (kept open on the owner's decision). The pull request "R0b live" waits for the owner's merge; nothing to start.
 2. A4 live on `pranav/a4-live`, started from `main` after R0b live is merged. First message: "Start A4 live from STATE.md: add the mlflow service to deploy/compose.yaml, close every [open: A4] UNVERIFIED line with /verify, check for leakage before any number is written down, then stop for the owner's calibration decision." Steps: add the `mlflow` service to `deploy/compose.yaml` (SPEC 7 and 8: profile `ml`, port bound to 127.0.0.1, a decision-log line); `einvoice seed`; `einvoice train` with the real e5 model, which also checks the "query: " prefix in `ml/coding.py`; `load_champion` from the Compose MLflow service; `einvoice eval` with the live validator; `einvoice convert` through KoSIT. Plausibility first: if a number looks too good, look for leakage (seller split, thresholds chosen on validation only, worst errors) before writing it down. Commit and push, open no PR yet. STOP for the calibration decision: show `ece` and `ece_uncalibrated` for both models from `reports/gl_coder.json`, from `reports/metrics.json` the test result at the operating point (coverage, wrong, risk_upper_95) and the worst errors, explain the "A4 findings" block, and recommend either isotonic as specified or top-label isotonic on out-of-fold scores. Do not tick A4 live before the decision. After it: apply it (retrain if needed), update `reports/`, this file and `docs/PHASE_LOG.md`, open the PR "A4 live".
 3. A5 live on `pranav/a5-live`, started from `main` after A4 live is merged. First message: "Start A5 live from STATE.md: run the provider probe, index the rules, record extraction and agent fixtures, write reports/agent_eval.json, then stop for the owner's review." Steps: `make fetch`; `einvoice db migrate`, `einvoice db index`; set `MIN_SIMILARITY` from a few relevant and unrelated queries; probe = `einvoice agent-eval` with each candidate `LLM_PROVIDER` (Gemini through `OPENAI_BASE_URL` first, ask before a paid one); `einvoice agent-eval --record` and `einvoice eval --record` with the chosen model; the owner reviews the recorded fixtures and the extraction accuracy (STOP).
 
@@ -40,11 +40,11 @@ VS Code on the laptop.
 `build` only.
 
 - [x] A0 Scaffold: build, live
-- [x] A1 Core (models, parsers, KoSIT client, rules): build; [ ] live (R0b)
-- [x] A2 Data (generator, AP policy, SKR03 subset, migrations): build; [ ] live (R0b)
+- [x] A1 Core (models, parsers, KoSIT client, rules): build; [x] live (R0b live, L1)
+- [x] A2 Data (generator, AP policy, SKR03 subset, migrations): build; [ ] live (one line open: PDF/A of the generated ZUGFeRD PDFs)
 - [x] A3 Extraction (text, OCR, LLM extraction, evidence check): build; [ ] live (R0b, A5)
 - [x] R0a Environment (dev container, Dockerfile, Compose, lockfile): [x] build, [x] live (L1)
-- [ ] R0b Catch-up: [x] build (cloud, S1), [ ] live (laptop)
+- [ ] R0b Catch-up: [x] build (cloud, S1), [ ] live (L1; one line open: PDF/A of the generated ZUGFeRD PDFs)
 - [ ] A4 Models + eval: [x] build (S2), [ ] live
 - [ ] A5 Agent: [x] build (S3), [ ] live (provider probe, recording; STOP)
 - [ ] A6a UI design: [x] prototype built (S4, on `pranav/a6a-ui-design`, not merged), [ ] owner approval (STOP)
@@ -125,6 +125,11 @@ One line each: date, decision, reason.
 - 2026-11-02: `get_invoice` returns field values without evidence (`invoice_summary`), plus review reasons and failed checks. Reason: the canonical record with XPaths and quotes is several times larger and the agent cites rules, not fields.
 - 2026-11-02: `evaluate.run_gold` takes `complete_for(record)` (`replay` or `recording`) instead of a replay directory. `einvoice eval --record` sends PDFs and scans to `LLM_PROVIDER` and keeps the last reply that parses as JSON, so extraction's one retry still works while recording. `metrics.json` has an `extraction` field naming the source of the replies.
 - 2026-11-02: `einvoice agent-eval` builds the corpus from `data/raw` also in replay mode, although replay never reads chunk texts. Reason: the same run checks that every case's source id exists in the real sources; CI does not run the agent eval (SPEC 7 gates only `einvoice eval`).
+- 2026-11-03: R0b live found two writer defects through KoSIT over `data/synth`: the UBL writer put `currencyID` on every element of a multi-step path (`render._sub`), and the CII writer lacked BT-23 (`convert.PEPPOL_BILLING_PROCESS`, PEPPOL-EN16931-R001). Both are fixed, each with a test that failed before. `render.py` takes the XRechnung id, the contact fields and the Peppol URN from `convert.py`, so the two writers cannot drift apart.
+- 2026-11-03: `tests/fixtures/kosit/report_reject_br_de_15.xml` is a real daemon report (406, BuyerReference missing) and replaces the hand-written one. `tests/fixtures/corpus/XRECHNUNG_Einfach.pdf` (public corpus file, listed in `tests/fixtures/NOTICE`) is the fixture for the `xrechnung.xml` attachment.
+- 2026-11-03: The OCR integration test requires the invoice number and the seller name on every generated scan and leaves the amounts out. Tesseract misreads a digit now and then (inv_00187 of seed 1 gives 36,64 for 35,27); the arithmetic rule and the evidence check are what catch that.
+- 2026-11-03: `SMALL_AMOUNT_LIMIT` = 250 EUR confirmed by the owner against §33 UStDV (gesetze-im-internet.de). `test_ustg14.py` pins 250.00 (relief applies) and 250.01 (it does not). The §33 exclusion for services under §§ 3c, 6a and 13b UStG is not implemented, on the owner's decision (open item in UNVERIFIED).
+- 2026-11-03: The ZUGFeRD PDFs of the generator are not valid PDF/A-3 (Mustang 2.26.0 with veraPDF). Not fixed on the owner's decision; the README Limitations names it.
 
 ## A4 findings (S2, cloud run on seed 1, 2000 invoices, hashing stub instead of e5, KoSIT skipped)
 Numbers are not quoted here because they come from a stubbed run outside `reports/`; rerun
