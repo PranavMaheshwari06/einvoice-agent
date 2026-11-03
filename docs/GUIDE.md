@@ -44,3 +44,11 @@ tests need the services from `deploy/compose.yaml` (added in phase R0a).
 
 Each phase appends a short section here: what was added, how to run it, what to look at.
 The release checklist (`docs/RELEASE_CHECKLIST.md`) is linked here when A9 writes it.
+
+### A6a UI design (S4)
+
+`docs/ui/brief.md` describes who uses the UI, the three screens, the user flows and the stack
+recommendation, and ends with the open points for your review. Open
+`docs/ui/prototype/index.html` in a browser to click through it: inbox, invoice view (click a
+field to see its evidence), checks, and the review queue with Approve, Correct and Reject. All
+data in it is invented (`data.js`); all UI text is in `strings.js`, German and English.

@@ -2,20 +2,26 @@
 
 Read this first in every session. Update it before every commit.
 
-Current phase: **A6a UI design** (session S4 next). A0 to A5 are built; R0a is live; R0b cloud
-part is done. The A5 live part (provider probe, recording, owner review) waits for the laptop.
+Current phase: **A6a UI design, waiting for the owner's review** (STOP). A0 to A5 are built;
+R0a is live; R0b cloud part is done. The A5 live part (provider probe, recording, owner review)
+waits for the laptop. The A6a prototype is in `docs/ui/` (S4).
 Rules: `CLAUDE.md`. Design: `docs/SPEC.md`. History: `docs/PHASE_LOG.md`.
 
 ## Next session
-Branch: `pranav/a6a-ui-design` (create it from `pranav/a5-agent`; S3 is not merged into `main`)
-Session: S4, phase A6a UI design, where: cloud, model: Opus
-First message: "Start S4 from STATE.md: design A6a (UI brief, user flows, clickable prototype, German/English string list), then stop for the owner's review."
+STOP first: the owner reviews `docs/ui/brief.md` and the prototype `docs/ui/prototype/index.html`
+(open it in a browser) and answers the six open points at the end of the brief (stack, API gaps,
+evidence boxes, explanation language, IBAN confirmation, template). Record the answers in the
+decision log, then start S5.
+
+Branch: `pranav/a6b-api-ui` (create it from `pranav/a6a-ui-design`; S3 and S4 are not merged into `main`)
+Session: S5, phase A6b build (then A7 build), where: cloud, model: Sonnet
+First message: "Start S5 from STATE.md: build A6b (API, persistence in db.py, the approved UI from docs/ui/) as listed in the brief, then hand off."
 Brief:
-- Read first: SPEC 3.12 (screens), 8 (A6a row and its STOP), and `docs/notes/agent.md` for what a review shows (proposal, action, citations, vendor email, guardrail reasons).
-- Produce: a short UI brief, the user flows (inbox, invoice view with evidence next to the fields, check results, review queue with Approve / Correct / Reject), a clickable prototype with fixed sample data (no API), and one German/English string list.
-- The stack is open: the SPEC names FastAPI + Jinja2 + HTMX as the candidate. Recommend one with a reason; adding a dependency needs a decision-log line.
-- STOP when the prototype exists: the owner approves or edits it and may supply a template. Do not start A6b.
-Do not touch: Dockerfile, Compose, devcontainer, k8s, Terraform, CI files; A5 agent code except to fix a bug the prototype exposes; A6b API and persistence.
+- Read first: the owner's answers in the decision log, `docs/ui/brief.md`, SPEC 3.12, 3.13, 6, 8.
+- Build the screens of the prototype as server-rendered templates with the approved stack; the string list `docs/ui/prototype/strings.js` becomes one Python dict with the same keys.
+- Persistence in `db.py`: store invoice, checks, decision; proposals, bookings and corrections as the brief's decision flow describes (approve, correct, reject).
+- The prototype and its sample data stay under `docs/ui/` as the design record; the app does not load them.
+Do not touch: Dockerfile, Compose, devcontainer, k8s, Terraform, CI files; A5 agent code except to fix a bug the UI exposes.
 
 Also open on the laptop (L1):
 - R0b live on `pranav/r0b-live`: "Start L1 from STATE.md: close the R0b UNVERIFIED lines (Postgres migrations and loading, KoSIT over data/synth, real daemon report fixture), then stop."
@@ -30,7 +36,7 @@ that one is already merged into `main`.
 | S1 (done) | instruction files, R0b cloud fixes | cloud, Sonnet | `pranav/claude-code-setup` |
 | S2 | A4 build | cloud, Opus | `pranav/a4-models-eval` |
 | S3 (done) | A5 build | cloud, Opus | `pranav/a5-agent` |
-| S4 | A6a UI design | cloud, Opus | `pranav/a6a-ui-design` |
+| S4 (done, review open) | A6a UI design | cloud, Opus | `pranav/a6a-ui-design` |
 | S5 | A6b build, A7 build | cloud, Sonnet | `pranav/a6b-api-ui` |
 | L1 | R0a, then live passes R0b, A4, A5, A6b, A7 | laptop dev container, Sonnet then Opus | `pranav/r0-dev-environment`, then `pranav/<phase>-live` |
 | L2 | A8, A9 | laptop, Opus then Sonnet | `pranav/a8-infra`, `pranav/a9-release` |
@@ -50,7 +56,7 @@ VS Code on the laptop.
 - [ ] R0b Catch-up: [x] build (cloud, S1), [ ] live (laptop)
 - [ ] A4 Models + eval: [x] build (S2), [ ] live
 - [ ] A5 Agent: [x] build (S3), [ ] live (provider probe, recording; STOP)
-- [ ] A6a UI design: [ ] prototype (S4; STOP)
+- [ ] A6a UI design: [x] prototype (S4), [ ] owner approval (STOP)
 - [ ] A6b API + UI: [ ] build (S5), [ ] live (STOP)
 - [ ] A7 Monitoring: [ ] build (S5), [ ] live
 - [ ] A8 Infra: build, live (laptop)
@@ -129,6 +135,11 @@ One line each: date, decision, reason.
 - 2026-11-02: `evaluate.run_gold` takes `complete_for(record)` (`replay` or `recording`) instead of a replay directory. `einvoice eval --record` sends PDFs and scans to `LLM_PROVIDER` and keeps the last reply that parses as JSON, so extraction's one retry still works while recording. `metrics.json` has an `extraction` field naming the source of the replies.
 - 2026-11-02: `einvoice agent-eval` builds the corpus from `data/raw` also in replay mode, although replay never reads chunk texts. Reason: the same run checks that every case's source id exists in the real sources; CI does not run the agent eval (SPEC 7 gates only `einvoice eval`).
 
+- 2026-11-03: S4 branch `pranav/a6a-ui-design` starts from `pranav/a5-agent` (not merged). The prototype is static: `docs/ui/prototype/index.html` with inline CSS and JS, `strings.js` (the string list, 178 keys) and `data.js` (sample data), loaded with `<script src>` so it opens from disk without a server. No web fonts, CDNs or libraries. Reason: the brief asks for a clickable prototype with no API, and the owner reviews it on any device.
+- 2026-11-03: Stack recommendation for A6b: FastAPI + Jinja2 + HTMX (vendored `htmx.min.js`); Jinja2 becomes a direct dependency of `api`, the `ui` extra with streamlit goes. Proposed, not decided: the owner approves at the A6a STOP.
+- 2026-11-03: Decision buttons appear only when a proposal row exists, because SPEC 3.12 approve and correct are `/proposals/{id}/...`; the agent runs on demand (`POST /reviews/{id}/agent`). "Correct" changes what was read (account, amounts, due date), not the vendor's invoice; net + VAT = gross is checked in cents before saving.
+- 2026-11-03: Prototype sample data is checked against the package: VAT ids pass `ustg14.is_valid_german_vat_id`, IBANs have valid check digits, amounts add up, check messages are the engine's real strings, and LOW_EXTRACTION_CONFIDENCE is set exactly when one of `engine.REQUIRED_EXTRACTED_FIELDS` is below 0.9. Found on the way: the A5 eval cases use VAT id `DE100000001`, which fails the check digit; harmless there because each case fixes the failed checks the agent sees.
+
 ## A4 findings (S2, cloud run on seed 1, 2000 invoices, hashing stub instead of e5, KoSIT skipped)
 Numbers are not quoted here because they come from a stubbed run outside `reports/`; rerun
 `einvoice train` and `einvoice eval` live to get them.
@@ -163,6 +174,7 @@ covers it, and deleting the line.
 - [open: A5] `agent/rag.py::ustg_chunks`: assumes the gesetze-im-internet.de XML has `norm/metadaten/enbez` = "§ 14" and one `textdaten/text/Content/P` per Absatz starting with "(n)", and no named entities that need the DTD [cloud-built]; the host is blocked here and `tests/fixtures/ustg/ustg_structure.xml` is hand-written. The UStG ids in the cases (`UStG-14-4`) are checked only then.
 - [open: A5] `agent/rag.py::store`, `nearest`: never ran against pgvector [cloud-built] (text literal with `::vector`, `<=>` as cosine distance, named parameters). `MIN_SIMILARITY` = 0.80 is a placeholder value to set from live queries; chunk lengths against e5's 512 tokens are unchecked.
 - [open: A5] `db/db.py::fetch_invoice`, `fetch_purchase_order`, `fetch_vendor_history` and the MCP tools on top: never ran against Postgres [cloud-built]; the stdio test only lists the tools. Full use needs stored invoices (A6b).
+- [open: A6b] `docs/ui/brief.md` open point 3: marking evidence on a real page image assumes the quote can be located with pdfplumber word positions (PDF) and tesseract word boxes (scan). Not tried; the prototype draws on an HTML page.
 - [open: A5] `einvoice eval --record`: never called a model [cloud-built]; the existing extraction fixtures are still hand-written (line above about `extract_de.txt`).
 
 ## Blockers

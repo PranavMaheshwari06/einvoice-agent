@@ -83,3 +83,21 @@ the replay results only show that the pipeline works; six `[cloud-built]` lines 
 `KeyError` in a tool no longer looks like a lookup miss), the round cap and citation recall over
 citing cases only. Result: ruff clean, 334 passed, 2 skipped (OCR). Next: S4, A6a UI design,
 Opus; A5 live on the laptop.
+
+## S4, A6a UI design (2026-11-03)
+
+Wrote `docs/ui/brief.md` (user, principles, screens mapped to SPEC 3.12, four user flows with a
+diagram, stack recommendation, six open points) and a clickable prototype in
+`docs/ui/prototype/`: inbox with upload, invoice view with the XML tree or the page next to the
+fields (click a field to mark its evidence), checks tab, and the review queue with the
+assistant's proposal, citations, vendor email draft and Approve / Correct / Reject. The string
+list (`strings.js`, 178 keys, German and English, every reason code) and the sample data
+(`data.js`, 13 invoices plus one for the upload) are separate files. Checked here: every flow
+driven in headless Chromium in both languages, light and dark, at 1360, 768 and 390 px wide (no
+console errors, no horizontal scroll); every string has both languages and the same
+placeholders; the sample data satisfies the engine's invariants (amounts, VAT check digits,
+real check messages, the extraction and GL gates). Two gaps in SPEC 3.12 came up: no list
+endpoint for the inbox and no reject endpoint; also a page-image endpoint is needed. Not built:
+any package code. `/simplify` removed an unused CSS rule (its review agents' reports were lost to
+a container restart, so the pass was repeated by hand); `/code-review` found nothing. Result:
+ruff clean, 334 passed, 2 skipped. Next: the owner's review (STOP), then S5, A6b build.
