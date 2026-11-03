@@ -56,3 +56,11 @@ On Windows, clone inside the WSL filesystem (`~/`), not under `/mnt/c`.
 
 An API key, if you use one, goes in `.env` (git-ignored), never in a committed file.
 `.env.example` lists the variable names.
+
+## Limitations
+
+- The ZUGFeRD PDFs that `einvoice seed` writes are not valid PDF/A-3. I ran two of them through
+  Mustang 2.26.0, which includes veraPDF, and both fail the same two rules: the Helvetica fonts
+  are not embedded, and DeviceGray is used without an output intent. The XML inside the one
+  without an injected error passed Mustang's XML check, and my parsers and rules read these
+  files. A strict PDF/A check would still reject them.
