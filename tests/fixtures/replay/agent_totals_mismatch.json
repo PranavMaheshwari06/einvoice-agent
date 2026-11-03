@@ -1,0 +1,35 @@
+{
+ "case": "totals_mismatch",
+ "source": "hand-written",
+ "responses": [
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "get_invoice",
+     "args": {
+      "invoice_id": 1008
+     },
+     "id": "call_1"
+    }
+   ]
+  },
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "search_rules",
+     "args": {
+      "query": "Bruttobetrag ist nicht Summe aus Netto und Umsatzsteuer",
+      "k": 4
+     },
+     "id": "call_2"
+    }
+   ]
+  },
+  {
+   "content": "{\"action\": \"request_correction\", \"explanation\": \"Net plus VAT is 499.80 EUR but the invoice states a gross total of 509.80 EUR.\", \"citations\": [\"AP-automatic-booking\"], \"vendor_email_de\": \"Sehr geehrte Damen und Herren,\\n\\nzu Ihrer Rechnung RE-2026-0412 vom 14.09.2026 bitten wir um eine korrigierte Rechnung: Der Bruttobetrag entspricht nicht der Summe aus Netto und Umsatzsteuer.\\n\\nMit freundlichen Grüßen\\nKreditorenbuchhaltung\"}",
+   "tool_calls": []
+  }
+ ]
+}

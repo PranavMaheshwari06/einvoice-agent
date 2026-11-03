@@ -1,0 +1,42 @@
+{
+ "case": "duplicate_same_number",
+ "source": "hand-written",
+ "responses": [
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "get_invoice",
+     "args": {
+      "invoice_id": 1017
+     },
+     "id": "call_1"
+    }
+   ]
+  },
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "get_vendor_history",
+     "args": {
+      "vat_id": "DE100000001"
+     },
+     "id": "call_2"
+    },
+    {
+     "name": "search_rules",
+     "args": {
+      "query": "doppelte Rechnung gleiche Rechnungsnummer",
+      "k": 4
+     },
+     "id": "call_3"
+    }
+   ]
+  },
+  {
+   "content": "{\"action\": \"reject\", \"explanation\": \"Invoice RE-2026-0412 from the same seller was already received on 2026-09-15; a duplicate is not booked.\", \"citations\": [\"AP-duplicates\"], \"vendor_email_de\": null}",
+   "tool_calls": []
+  }
+ ]
+}

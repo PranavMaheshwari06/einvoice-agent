@@ -1,0 +1,35 @@
+{
+ "case": "not_validated",
+ "source": "hand-written",
+ "responses": [
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "get_invoice",
+     "args": {
+      "invoice_id": 1027
+     },
+     "id": "call_1"
+    }
+   ]
+  },
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "search_rules",
+     "args": {
+      "query": "XRechnung nicht validiert KoSIT",
+      "k": 4
+     },
+     "id": "call_2"
+    }
+   ]
+  },
+  {
+   "content": "{\"action\": \"escalate\", \"explanation\": \"The structured invoice was not checked by the validator, and booking without a validator accept is not allowed; run the validation again.\", \"citations\": [\"AP-automatic-booking\"], \"vendor_email_de\": null}",
+   "tool_calls": []
+  }
+ ]
+}

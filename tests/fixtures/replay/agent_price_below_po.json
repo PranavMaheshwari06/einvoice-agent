@@ -1,0 +1,42 @@
+{
+ "case": "price_below_po",
+ "source": "hand-written",
+ "responses": [
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "get_invoice",
+     "args": {
+      "invoice_id": 1012
+     },
+     "id": "call_1"
+    }
+   ]
+  },
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "get_purchase_order",
+     "args": {
+      "po_number": "PO-2026-0117"
+     },
+     "id": "call_2"
+    },
+    {
+     "name": "search_rules",
+     "args": {
+      "query": "Preisabweichung zur Bestellung Toleranz",
+      "k": 4
+     },
+     "id": "call_3"
+    }
+   ]
+  },
+  {
+   "content": "{\"action\": \"request_correction\", \"explanation\": \"The unit price of 95.00 EUR is 9.5 % below the order; the tolerance of 2 % applies in both directions, so the vendor should confirm the price.\", \"citations\": [\"AP-price-tolerance\"], \"vendor_email_de\": \"Sehr geehrte Damen und Herren,\\n\\nzu Ihrer Rechnung RE-2026-0412 vom 14.09.2026 bitten wir um eine korrigierte Rechnung: Bitte bestätigen Sie den Stückpreis; er weicht von der Bestellung ab.\\n\\nMit freundlichen Grüßen\\nKreditorenbuchhaltung\"}",
+   "tool_calls": []
+  }
+ ]
+}

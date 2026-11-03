@@ -2,6 +2,7 @@
 
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import date
 from decimal import Decimal
@@ -26,6 +27,7 @@ from einvoice.synth.generate import prior_invoice, read_gold, read_master_data
 
 logger = logging.getLogger(__name__)
 
+CompleteFor = Callable[[dict], Complete | None]
 EXTRACT_THRESHOLDS = (0.5, 0.7, 0.8, 0.9, 0.95, 0.99)
 GL_THRESHOLDS = tuple(round(step / 100, 2) for step in range(101))
 
@@ -78,7 +80,8 @@ def _context(
     )
 
 
-def _replay(replay_dir: Path, record: dict) -> Complete | None:
+def replay(replay_dir: Path, record: dict) -> Complete | None:
+    """The recorded reply for this gold invoice, or None when there is none."""
     path = replay_dir / f"{record['id']}.json"
     if not path.exists():
         return None
@@ -86,14 +89,39 @@ def _replay(replay_dir: Path, record: dict) -> Complete | None:
     return lambda _prompt: response
 
 
+def recording(live: Complete, replay_dir: Path, record: dict) -> Complete:
+    """Ask the live model and keep its last JSON reply in the format `replay` reads."""
+
+    def complete(prompt: str) -> str:
+        reply = live(prompt)
+        try:
+            content = json.loads(reply)
+        except json.JSONDecodeError:
+            # Extraction retries once with the error; only a JSON reply can be replayed.
+            return reply
+        replay_dir.mkdir(parents=True, exist_ok=True)
+        (replay_dir / f"{record['id']}.json").write_text(
+            json.dumps({"pdf": record["file"], "content": content}, ensure_ascii=False, indent=1)
+            + "\n",
+            encoding="utf-8",
+        )
+        return reply
+
+    return complete
+
+
 def _no_model(_prompt: str) -> str:
     raise RuntimeError("structured input never reaches the language model")
 
 
 def run_gold(
-    directory: Path, validate: Validate, suggest: Suggest, replay_dir: Path
+    directory: Path, validate: Validate, suggest: Suggest, complete_for: CompleteFor
 ) -> tuple[dict[str, list[Evaluated]], dict[str, int]]:
-    """Process validation and test invoices in issue order; every earlier invoice is a prior one."""
+    """Process validation and test invoices in issue order; every earlier invoice is a prior one.
+
+    `complete_for(record)` gives the model for a PDF or scan (`replay` or `recording`); a PDF or
+    scan without one is skipped and counted.
+    """
     vendors, orders = read_master_data(directory)
     vendor_by_vat_id = {vendor.vat_id: vendor for vendor in vendors}
     order_by_number = {order.po_number: order for order in orders}
@@ -102,14 +130,14 @@ def run_gold(
     prior: list[PriorInvoice] = []
     for record in read_gold(directory):
         split = record["split"]
-        complete = _replay(replay_dir, record)
         structured = record["format"] in STRUCTURED_FORMATS
-        if split in evaluated and not structured and complete is None:
+        complete = _no_model if structured or split not in evaluated else complete_for(record)
+        if split in evaluated and complete is None:
             skipped[split] += 1
         elif split in evaluated:
             context_for = partial(_context, vendor_by_vat_id, order_by_number, list(prior))
             content = (directory / record["file"]).read_bytes()
-            outcome = process(content, context_for, validate, complete or _no_model, suggest)
+            outcome = process(content, context_for, validate, complete, suggest)
             errors = booking_errors(outcome.invoice, outcome.gl_account, record)
             evaluated[split].append(Evaluated(record, outcome, errors))
         prior.append(prior_invoice(record))
@@ -235,17 +263,22 @@ def evaluate(
     kosit: str,
     suggest: Suggest,
     encoder: str,
-    replay_dir: Path,
+    complete_for: CompleteFor,
+    extraction: str,
     reports: Path,
 ) -> dict:
-    """Write reports/metrics.json and reports/risk_coverage.png; `kosit` says how KoSIT ran."""
-    evaluated, skipped = run_gold(directory, validate, suggest, replay_dir)
+    """Write reports/metrics.json and reports/risk_coverage.png.
+
+    `kosit` and `extraction` say how KoSIT ran and where the model replies came from.
+    """
+    evaluated, skipped = run_gold(directory, validate, suggest, complete_for)
     for split, items in evaluated.items():
         if not items:
             raise ValueError(f"no {split} invoice could be processed (skipped: {skipped[split]})")
     metrics = {
         "kosit": kosit,
         "encoder": encoder,
+        "extraction": extraction,
         "thresholds_chosen_on": "validation",
         "reported_on": "test",
         "processed": {split: len(items) for split, items in evaluated.items()},

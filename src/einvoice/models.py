@@ -14,6 +14,10 @@ STRUCTURED_FORMATS: tuple[Format, ...] = ("ubl", "cii", "zugferd_pdf")
 T = TypeVar("T")
 
 
+class NotFound(LookupError):
+    """A record asked for by id or number does not exist; the agent may try another one."""
+
+
 class Evidence(BaseModel):
     """Where a value came from: an XML element (BT id + XPath) or a page and quote in a PDF."""
 

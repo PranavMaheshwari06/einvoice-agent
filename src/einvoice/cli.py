@@ -8,6 +8,11 @@ from pathlib import Path
 
 from einvoice.config import get_settings
 
+RAW_DATA = Path("data/raw")
+AP_POLICY = Path("data/rules/ap_policy.md")
+AGENT_CASES = Path("evals/agent_cases.yaml")
+REPLAY_DIR = Path("tests/fixtures/replay")
+
 
 def show_config(_args: argparse.Namespace) -> None:
     settings = get_settings()
@@ -42,6 +47,17 @@ def db_load(args: argparse.Namespace) -> None:
     print(f"loaded master data from {args.dir}")
 
 
+def db_index(_args: argparse.Namespace) -> None:
+    from einvoice.agent import rag
+    from einvoice.db import db
+    from einvoice.ml.coding import E5Encoder
+
+    chunks = rag.corpus(RAW_DATA, AP_POLICY)
+    with db.connect(get_settings().database_url) as conn:
+        rag.store(conn, chunks, E5Encoder(prefix=rag.PASSAGE_PREFIX))
+    print(f"indexed {len(chunks)} rule chunks into rule_chunks")
+
+
 def train(args: argparse.Namespace) -> None:
     from einvoice.ml.coding import E5_MODEL, E5Encoder
     from einvoice.ml.train import train as train_models
@@ -59,12 +75,25 @@ def evaluate(args: argparse.Namespace) -> None:
     from functools import partial
 
     from einvoice.evaluate import evaluate as run_evaluation
+    from einvoice.evaluate import recording, replay
     from einvoice.ml.coding import suggest_account
     from einvoice.ml.train import load_champion
     from einvoice.models import ValidationResult
     from einvoice.validation import kosit
 
     settings = get_settings()
+    replay_dir = args.dir / "replay"
+    if args.record:
+        from einvoice.llm import chat_model, complete
+
+        if settings.llm_provider == "replay":
+            raise SystemExit("--record needs a real LLM_PROVIDER, not replay")
+        live = partial(complete, chat_model(settings))
+        complete_for = partial(recording, live, replay_dir)
+        extraction = f"live {settings.llm_provider}:{settings.llm_model}, recorded to {replay_dir}"
+    else:
+        complete_for = partial(replay, replay_dir)
+        extraction = f"replay from {replay_dir}"
     model, encoder = load_champion(settings.mlflow_tracking_uri)
     if args.fixtures:
 
@@ -81,11 +110,23 @@ def evaluate(args: argparse.Namespace) -> None:
         kosit_note,
         partial(suggest_account, model),
         encoder,
-        args.dir / "replay",
+        complete_for,
+        extraction,
         Path("reports"),
     )
     print(json.dumps(metrics["test"], indent=1))
     print("wrote reports/metrics.json and reports/risk_coverage.png")
+
+
+def agent_eval(args: argparse.Namespace) -> None:
+    from einvoice.agent import evals, rag
+
+    chunks = {chunk.source_id: chunk for chunk in rag.corpus(RAW_DATA, AP_POLICY)}
+    report = evals.evaluate(
+        AGENT_CASES, REPLAY_DIR, chunks, get_settings(), Path("reports"), args.record
+    )
+    print(f"{report['passed']} of {report['cases']} cases passed (model: {report['model']})")
+    print("wrote reports/agent_eval.json")
 
 
 def convert(args: argparse.Namespace) -> None:
@@ -133,6 +174,10 @@ def build_parser() -> argparse.ArgumentParser:
     load = database_commands.add_parser("load", help="load vendors and purchase orders from seed")
     load.add_argument("--dir", type=Path, default=Path("data/synth"))
     load.set_defaults(handler=db_load)
+    index = database_commands.add_parser(
+        "index", help="embed UStG §14, the AP policy and the BR-DE rules into rule_chunks"
+    )
+    index.set_defaults(handler=db_index)
 
     train_command = subcommands.add_parser(
         "train", help="train the GL-account models and register the champion in MLflow"
@@ -147,7 +192,22 @@ def build_parser() -> argparse.ArgumentParser:
     eval_command.add_argument(
         "--fixtures", action="store_true", help="skip KoSIT and count structured input as accepted"
     )
+    eval_command.add_argument(
+        "--record",
+        action="store_true",
+        help="send PDFs and scans to LLM_PROVIDER and save the replies under <dir>/replay",
+    )
     eval_command.set_defaults(handler=evaluate)
+
+    agent_command = subcommands.add_parser(
+        "agent-eval", help="run the review agent on evals/agent_cases.yaml; writes a report"
+    )
+    agent_command.add_argument(
+        "--record",
+        action="store_true",
+        help="use LLM_PROVIDER and save its replies as the cases' replay fixtures",
+    )
+    agent_command.set_defaults(handler=agent_eval)
 
     convert_command = subcommands.add_parser(
         "convert", help="write a structured invoice as XRechnung CII and validate it with KoSIT"

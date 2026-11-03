@@ -138,3 +138,46 @@ def test_eval_with_fixtures_says_kosit_was_not_called(monkeypatch, gold_dir, gl_
     metrics = json.loads((tmp_path / "reports" / "metrics.json").read_text())
     assert metrics["kosit"].startswith("not called (--fixtures)")
     assert metrics["encoder"] == "tfidf"
+
+
+def test_eval_record_needs_a_real_provider(monkeypatch, tmp_path):
+    monkeypatch.setenv("LLM_PROVIDER", "replay")
+    with pytest.raises(SystemExit, match="--record needs a real LLM_PROVIDER"):
+        main(["eval", "--dir", str(tmp_path), "--record"])
+
+
+def test_db_index_embeds_the_corpus_with_the_passage_prefix(monkeypatch, capsys):
+    from einvoice.agent import rag
+    from einvoice.agent.rag import Chunk
+    from einvoice.db import db
+
+    stored = []
+    monkeypatch.setattr(db, "connect", lambda _url: FakeConnection())
+    monkeypatch.setattr(rag, "corpus", lambda _raw, _policy: [Chunk("BR-DE-15", "BR-DE-15", "")])
+    monkeypatch.setattr(rag, "store", lambda _conn, chunks, encoder: stored.append(encoder))
+
+    main(["db", "index"])
+
+    assert stored[0]._prefix == "passage: "
+    assert "indexed 1 rule chunks" in capsys.readouterr().out
+
+
+def test_agent_eval_writes_the_report(monkeypatch, tmp_path, capsys):
+    from einvoice import cli
+    from einvoice.agent import evals, rag
+    from einvoice.agent.rag import Chunk
+
+    cases = FIXTURES.parents[1] / cli.AGENT_CASES
+    ids = {source_id for case in evals.load_cases(cases) for source_id in case["rules"]}
+    chunks = [Chunk(source_id, source_id, "") for source_id in ids]
+    monkeypatch.setattr(cli, "AGENT_CASES", cases)
+    monkeypatch.setattr(cli, "REPLAY_DIR", FIXTURES / "replay")
+    monkeypatch.setattr(rag, "corpus", lambda _raw, _policy: chunks)
+    monkeypatch.setenv("LLM_PROVIDER", "replay")
+    monkeypatch.chdir(tmp_path)
+
+    main(["agent-eval"])
+
+    report = json.loads((tmp_path / "reports" / "agent_eval.json").read_text())
+    assert report["model"] == "replay"
+    assert f"{report['passed']} of {report['cases']} cases passed" in capsys.readouterr().out

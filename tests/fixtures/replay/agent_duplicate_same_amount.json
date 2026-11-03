@@ -1,0 +1,42 @@
+{
+ "case": "duplicate_same_amount",
+ "source": "hand-written",
+ "responses": [
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "get_invoice",
+     "args": {
+      "invoice_id": 1018
+     },
+     "id": "call_1"
+    }
+   ]
+  },
+  {
+   "content": "",
+   "tool_calls": [
+    {
+     "name": "get_vendor_history",
+     "args": {
+      "vat_id": "DE100000001"
+     },
+     "id": "call_2"
+    },
+    {
+     "name": "search_rules",
+     "args": {
+      "query": "doppelte Rechnung gleicher Betrag innerhalb von 7 Tagen",
+      "k": 4
+     },
+     "id": "call_3"
+    }
+   ]
+  },
+  {
+   "content": "{\"action\": \"reject\", \"explanation\": \"The seller sent the same gross amount of 499.80 EUR under number RE-2026-0409 four days earlier; the policy treats this as a duplicate.\", \"citations\": [\"AP-duplicates\"], \"vendor_email_de\": null}",
+   "tool_calls": []
+  }
+ ]
+}
