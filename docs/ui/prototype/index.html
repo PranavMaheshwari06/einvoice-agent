@@ -1,0 +1,1140 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rechnungseingang</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: an inbox ledger; the invoice view puts the document on the left and the fields
+   (the booking slip) on the right; the review queue is a list beside one open case.
+   No web fonts or CDNs: the app serves only its own files (DSGVO). */
+:root {
+  --paper: #f2f4f7;
+  --surface: #ffffff;
+  --sunken: #e8ecf1;
+  --ink: #18212d;
+  --muted: #5a6575;
+  --line: #d6dce4;
+  --accent: #1d4f91;
+  --accent-ink: #ffffff;
+  --accent-soft: #e2ebf7;
+  --ok: #1a6b43;
+  --ok-soft: #dff1e6;
+  --warn: #875800;
+  --warn-soft: #fbefd6;
+  --bad: #a3301d;
+  --bad-soft: #fae3de;
+  --marker: #ffe171;
+  --marker-soft: #fff4c2;
+  --page-bg: #ffffff;
+  --page-ink: #1c1c1c;
+  --page-line: #cfcfcf;
+  --scan-bg: #efede6;
+
+  --font-ui: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-data: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+  --font-page: Arial, Helvetica, sans-serif;
+
+  --t-xs: 0.75rem;
+  --t-sm: 0.8125rem;
+  --t-md: 0.875rem;
+  --t-lg: 1rem;
+  --t-xl: 1.25rem;
+  --t-2xl: 1.625rem;
+  --r: 6px;
+  --gutter-l: max(16px, env(safe-area-inset-left, 0px));
+  --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #11161d; --surface: #19202a; --sunken: #232c38; --ink: #e5e9ef; --muted: #9aa5b3;
+    --line: #2e3845; --accent: #86b2ea; --accent-ink: #0e1622; --accent-soft: #1d2d44;
+    --ok: #6fd09c; --ok-soft: #173326; --warn: #e8b85a; --warn-soft: #3a2d12;
+    --bad: #f1907f; --bad-soft: #3d1f1a; --marker-soft: #4a3f10;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #11161d; --surface: #19202a; --sunken: #232c38; --ink: #e5e9ef; --muted: #9aa5b3;
+  --line: #2e3845; --accent: #86b2ea; --accent-ink: #0e1622; --accent-soft: #1d2d44;
+  --ok: #6fd09c; --ok-soft: #173326; --warn: #e8b85a; --warn-soft: #3a2d12;
+  --bad: #f1907f; --bad-soft: #3d1f1a; --marker-soft: #4a3f10;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font: var(--t-md)/1.45 var(--font-ui);
+}
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
+  z-index: 10; background: var(--surface);
+}
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+h1 { font-size: var(--t-2xl); line-height: 1.2; font-weight: 650; letter-spacing: -0.01em; }
+h2 { font-size: var(--t-xl); line-height: 1.25; font-weight: 650; }
+h3 { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 650; }
+p { margin: 0; }
+a { color: var(--accent); }
+code, .mono { font-family: var(--font-data); font-size: 0.92em; }
+.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.muted { color: var(--muted); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.bar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--surface); border-bottom: 1px solid var(--line);
+}
+.bar-inner {
+  max-width: 1320px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center;
+  gap: 8px 20px; padding-block: 10px; padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+}
+.brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+.brand strong { font-size: var(--t-lg); letter-spacing: -0.01em; }
+.brand span { font-size: var(--t-xs); color: var(--warn); background: var(--warn-soft); padding: 1px 8px; border-radius: 999px; }
+.nav { display: flex; gap: 4px; }
+.nav a {
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: var(--r);
+  color: var(--ink); text-decoration: none; font-weight: 600;
+}
+.nav a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
+.count {
+  min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--warn); color: var(--surface);
+  font-size: var(--t-xs); text-align: center; font-variant-numeric: tabular-nums;
+}
+
+main {
+  max-width: 1320px; margin: 0 auto; padding-block: 24px 64px;
+  padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+}
+.stack { display: grid; gap: 16px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.spread { justify-content: space-between; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  font: 600 var(--t-md)/1.2 var(--font-ui); padding: 9px 14px; border-radius: var(--r);
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer;
+  text-decoration: none;
+}
+.btn:hover { background: var(--sunken); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.danger { color: var(--bad); border-color: var(--bad); }
+.btn.danger.solid { background: var(--bad); color: var(--surface); }
+.btn.small { padding: 5px 10px; font-size: var(--t-sm); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; filter: none; }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; cursor: pointer; text-decoration: underline; }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px;
+  font-size: var(--t-xs); font-weight: 650; white-space: nowrap; background: var(--sunken); color: var(--muted);
+}
+.chip.dot::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.chip.ok { background: var(--ok-soft); color: var(--ok); }
+.chip.warn { background: var(--warn-soft); color: var(--warn); }
+.chip.bad { background: var(--bad-soft); color: var(--bad); }
+.chip.info { background: var(--accent-soft); color: var(--accent); }
+.fmt {
+  font: 600 var(--t-xs) var(--font-data); letter-spacing: 0.04em; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; white-space: nowrap;
+}
+.bt { font: 600 0.6875rem var(--font-data); color: var(--muted); }
+
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; }
+.ledger th {
+  text-align: left; font-size: var(--t-xs); text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--muted); font-weight: 650; padding: 10px 14px; border-bottom: 1px solid var(--line); white-space: nowrap;
+}
+.ledger th.num { text-align: right; }
+.ledger td { padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.ledger tbody tr:last-child td { border-bottom: 0; }
+.ledger tbody tr[data-action] { cursor: pointer; }
+.ledger tbody tr[data-action]:hover { background: var(--sunken); }
+.ledger a { color: inherit; text-decoration: none; font-weight: 600; }
+
+.filters { display: flex; gap: 6px; flex-wrap: wrap; }
+.filters button {
+  font: 600 var(--t-sm) var(--font-ui); padding: 5px 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+}
+.filters button[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+
+.progress { display: flex; flex-wrap: wrap; gap: 8px 20px; padding: 12px 14px; background: var(--surface); border: 1px dashed var(--accent); border-radius: 10px; }
+.progress li { list-style: none; color: var(--muted); }
+.progress li.done { color: var(--ok); }
+.progress li.now { color: var(--accent); font-weight: 650; }
+.progress ol { display: contents; }
+
+/* Invoice view */
+.inv-head { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-start; justify-content: space-between; }
+.stamp {
+  border: 2px solid var(--accent); color: var(--accent); border-radius: 4px; padding: 4px 10px;
+  font: 700 var(--t-xs) var(--font-data); text-transform: uppercase; letter-spacing: 0.08em;
+  transform: rotate(-2deg); white-space: nowrap;
+}
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); }
+.tabs button {
+  font: 600 var(--t-md) var(--font-ui); padding: 9px 14px; background: none; border: 0; cursor: pointer;
+  color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 24px; align-items: start; }
+.split > * { min-width: 0; }
+.doc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 64px); container-type: inline-size; }
+.doc-label { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+
+.xml {
+  position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 0;
+  overflow: auto; max-height: 72vh; font: var(--t-xs)/1.6 var(--font-data);
+}
+.x-line { white-space: pre; padding: 0 14px; color: var(--muted); }
+.x-tag { color: var(--accent); }
+.x-attr { color: var(--warn); }
+.x-text { color: var(--ink); font-weight: 600; }
+.x-ev { cursor: pointer; }
+.x-ev:hover { background: var(--sunken); }
+.x-ev.on { background: var(--marker-soft); box-shadow: inset 3px 0 0 var(--warn); }
+
+.page {
+  background: var(--page-bg); color: var(--page-ink); font-family: var(--font-page);
+  aspect-ratio: 1 / 1.414; max-width: 100%; padding: 7cqi 7cqi 5cqi; font-size: 2.1cqi; line-height: 1.4;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.12), 0 8px 24px rgb(0 0 0 / 0.10); display: flex; flex-direction: column; gap: 3.2cqi;
+  overflow: hidden;
+}
+.page.scan { background: var(--scan-bg); transform: rotate(0.6deg); filter: grayscale(1) contrast(0.92); }
+.page.scan .ev { filter: blur(0.25px); }
+.pg-head { display: flex; justify-content: space-between; gap: 4cqi; }
+.pg-logo { width: 9cqi; height: 9cqi; border: 0.5cqi solid var(--page-ink); border-radius: 50%; flex: none; }
+.pg-window small { font-size: 1.5cqi; text-decoration: underline; color: #555; }
+.pg-title { font-size: 4cqi; font-weight: 700; margin: 0; }
+.pg-meta { display: grid; grid-template-columns: max-content 1fr; gap: 0.6cqi 3cqi; margin: 0; }
+.pg-meta dt { color: #555; }
+.pg-meta dd { margin: 0; }
+.pg-lines th, .pg-lines td { text-align: left; padding: 0.8cqi 0.6cqi; border-bottom: 1px solid var(--page-line); font-size: 1.9cqi; }
+.pg-lines th { font-weight: 700; }
+.pg-lines .r, .pg-totals td:last-child { text-align: right; }
+.pg-totals { width: 55%; margin-left: auto; }
+.pg-totals td { padding: 0.5cqi 0.6cqi; }
+.pg-totals .sum td { font-weight: 700; border-top: 1px solid var(--page-ink); }
+.pg-foot { margin-top: auto; border-top: 1px solid var(--page-line); padding-top: 1.5cqi; font-size: 1.6cqi; color: #444; }
+.page .ev { background: none; color: inherit; cursor: pointer; border-radius: 2px; padding: 0 0.3cqi; }
+.page .ev:hover { background: rgb(255 225 113 / 0.45); }
+.page .ev.on { background: var(--marker); outline: 0.4cqi solid var(--marker); }
+
+.fields { display: grid; gap: 20px; }
+.fields table { background: var(--surface); }
+.fields td, .fields th { padding: 8px 12px; }
+.fields tbody tr { cursor: pointer; }
+.fields tbody tr:hover { background: var(--sunken); }
+.fields tbody tr.on { background: var(--marker-soft); box-shadow: inset 3px 0 0 var(--warn); }
+.fields .label { display: grid; }
+.fields .ev-cell { color: var(--muted); font-size: var(--t-sm); max-width: 18rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conf { display: inline-flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.meter { width: 56px; height: 6px; background: var(--sunken); border-radius: 3px; overflow: hidden; }
+.meter span { display: block; height: 100%; background: var(--ok); }
+.meter.low span { background: var(--bad); }
+.low-text { color: var(--bad); font-weight: 650; }
+.missing { color: var(--bad); font-weight: 650; }
+
+.checklist { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.checklist li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.checklist li:last-child { border-bottom: 0; }
+.checklist .msg { grid-column: 2; color: var(--muted); font: var(--t-xs)/1.5 var(--font-data); overflow-wrap: anywhere; }
+details.passed { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+details.passed summary { cursor: pointer; padding: 12px 14px; font-weight: 600; }
+details.passed ul { margin: 0; padding: 0 14px 12px; list-style: none; display: grid; gap: 4px; }
+details.passed li { font: var(--t-xs)/1.5 var(--font-data); color: var(--muted); overflow-wrap: anywhere; }
+details.passed li::before { content: "✓ "; color: var(--ok); }
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; margin: 0; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; }
+.gl { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.gl .meter { width: 160px; height: 8px; position: relative; overflow: visible; }
+.gl .meter::after { content: ""; position: absolute; top: -3px; bottom: -3px; left: 90%; width: 2px; background: var(--ink); }
+
+/* Review queue */
+.reviews { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 24px; align-items: start; }
+.reviews > * { min-width: 0; }
+.queue { display: grid; gap: 12px; }
+.queue ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.queue a {
+  display: grid; gap: 4px; padding: 11px 13px; border-radius: 8px; background: var(--surface);
+  border: 1px solid var(--line); color: var(--ink); text-decoration: none;
+}
+.queue a:hover { border-color: var(--accent); }
+.queue a[aria-current="true"] { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.queue .q-top { display: flex; justify-content: space-between; gap: 8px; font-weight: 650; }
+.queue .q-sub { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; color: var(--muted); font-size: var(--t-sm); }
+.case { display: grid; gap: 22px; }
+.case section { display: grid; gap: 10px; }
+.reasons { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.reasons li { display: grid; gap: 2px; }
+.reasons li strong { font-weight: 650; }
+.compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 10px; }
+.compare div { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 2px; }
+.compare div.changed { border-color: var(--bad); }
+.compare span { font-size: var(--t-xs); color: var(--muted); }
+.compare code { overflow-wrap: anywhere; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 12px; }
+.guard { background: var(--bad-soft); color: var(--bad); border-radius: 8px; padding: 10px 12px; font-weight: 600; }
+.explain { max-width: 65ch; }
+.cites { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.cites button {
+  font: 600 var(--t-xs) var(--font-data); padding: 3px 9px; border-radius: 4px; cursor: pointer;
+  border: 1px solid var(--accent); background: var(--accent-soft); color: var(--accent);
+}
+.cites button[aria-expanded="true"] { background: var(--accent); color: var(--accent-ink); }
+.chunk { border-left: 3px solid var(--accent); padding: 6px 12px; color: var(--muted); max-width: 70ch; }
+.mail { white-space: pre-wrap; margin: 0; padding: 12px 14px; background: var(--sunken); border-radius: 8px; font: var(--t-sm)/1.55 var(--font-ui); max-width: 70ch; }
+.thinking { display: flex; align-items: center; gap: 10px; color: var(--muted); }
+.thinking::before {
+  content: ""; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.decide { position: sticky; bottom: env(safe-area-inset-bottom, 0px); background: var(--paper); padding-block: 12px; border-top: 1px solid var(--line); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 14px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 12px; }
+.form-grid label { display: grid; gap: 4px; font-size: var(--t-sm); color: var(--muted); }
+.form-grid input, .form-grid select {
+  font: var(--t-md) var(--font-ui); padding: 8px 10px; border-radius: var(--r); border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink); min-width: 0;
+}
+.form-grid input.changed, .form-grid select.changed { border-color: var(--warn); background: var(--warn-soft); }
+.check { display: flex; gap: 10px; align-items: flex-start; }
+.note { font-size: var(--t-sm); color: var(--muted); max-width: 70ch; }
+.error { color: var(--bad); font-weight: 600; }
+.warnline { color: var(--warn); font-weight: 600; }
+.done-banner { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 12px 14px; border-radius: 10px; background: var(--ok-soft); color: var(--ok); font-weight: 650; }
+.done-banner.bad { background: var(--bad-soft); color: var(--bad); }
+.back-mobile { display: none; }
+.empty { padding: 24px; text-align: center; color: var(--muted); background: var(--surface); border: 1px dashed var(--line); border-radius: 10px; }
+
+#toast {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  background: var(--ink); color: var(--paper); padding: 10px 16px; border-radius: 8px; font-weight: 600;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.25); max-width: calc(100% - 32px); z-index: 20;
+}
+
+@media (max-width: 980px) {
+  .split { grid-template-columns: minmax(0, 1fr); }
+  .doc { position: static; }
+}
+@media (max-width: 900px) {
+  .reviews { grid-template-columns: minmax(0, 1fr); }
+  .reviews.has-case .queue { display: none; }
+  .reviews:not(.has-case) .case { display: none; }
+  .back-mobile { display: inline; }
+}
+@media (max-width: 640px) {
+  .hide-narrow { display: none; }
+  .fields .ev-cell { max-width: 9rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .thinking::before { animation: none; }
+  .stamp, .page.scan { transform: none; }
+}
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="bar-inner">
+    <div class="brand"><strong data-s="app_name"></strong><span data-s="sample_data"></span></div>
+    <nav class="nav" id="nav"></nav>
+    <button class="btn small" type="button" data-action="lang" id="lang"></button>
+  </div>
+</header>
+<main id="view"></main>
+<div id="toast" role="status" hidden></div>
+<script src="strings.js"></script>
+<script src="data.js"></script>
+<script>
+"use strict";
+
+const FIELD_GROUPS = [
+  ["group_parties", ["seller_name", "seller_vat_id", "seller_address", "iban", "buyer_name"]],
+  ["group_dates", ["number", "issue_date", "delivery_date", "due_date", "po_number", "buyer_reference"]],
+  ["group_amounts", ["tax_exclusive_total", "vat_total", "gross_total", "amount_due"]],
+];
+const FIELD_BT = {
+  seller_name: "BT-27", seller_vat_id: "BT-31", seller_address: "BG-5", iban: "BT-84", buyer_name: "BT-44",
+  number: "BT-1", issue_date: "BT-2", delivery_date: "BT-72", due_date: "BT-9", po_number: "BT-13",
+  buyer_reference: "BT-10", tax_exclusive_total: "BT-109", vat_total: "BT-110", gross_total: "BT-112",
+  amount_due: "BT-115",
+};
+const MONEY_FIELDS = ["tax_exclusive_total", "vat_total", "gross_total", "amount_due"];
+const DATE_FIELDS = ["issue_date", "delivery_date", "due_date"];
+// rules/engine.py REQUIRED_EXTRACTED_FIELDS: only these gate LOW_EXTRACTION_CONFIDENCE.
+const REQUIRED_EXTRACTED = ["number", "issue_date", "seller_name", "tax_exclusive_total", "vat_total", "gross_total"];
+const STRUCTURED = ["ubl", "cii", "zugferd_pdf"];
+const ACTION_TONE = { approve_booking: "ok", request_correction: "warn", reject: "bad", escalate: "info" };
+const STATUS_TONE = { auto_booked: "ok", open: "warn", approved: "ok", corrected: "ok", rejected: "bad" };
+
+// Element paths as the parsers read them (parsing/ubl.py, parsing/cii.py), in schema order.
+const UBL = "Invoice";
+const CII_TX = "rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction";
+const CII_AG = `${CII_TX}/ram:ApplicableHeaderTradeAgreement`;
+const CII_ST = `${CII_TX}/ram:ApplicableHeaderTradeSettlement`;
+const CII_SUM = `${CII_ST}/ram:SpecifiedTradeSettlementHeaderMonetarySummation`;
+const XML_PATHS = {
+  ubl: [
+    ["number", `${UBL}/cbc:ID`],
+    ["issue_date", `${UBL}/cbc:IssueDate`],
+    ["due_date", `${UBL}/cbc:DueDate`],
+    ["buyer_reference", `${UBL}/cbc:BuyerReference`],
+    ["po_number", `${UBL}/cac:OrderReference/cbc:ID`],
+    ["seller_address", `${UBL}/cac:AccountingSupplierParty/cac:Party/cac:PostalAddress`],
+    ["seller_vat_id", `${UBL}/cac:AccountingSupplierParty/cac:Party/cac:PartyTaxScheme/cbc:CompanyID`],
+    ["seller_name", `${UBL}/cac:AccountingSupplierParty/cac:Party/cac:PartyLegalEntity/cbc:RegistrationName`],
+    ["buyer_name", `${UBL}/cac:AccountingCustomerParty/cac:Party/cac:PartyLegalEntity/cbc:RegistrationName`],
+    ["delivery_date", `${UBL}/cac:Delivery/cbc:ActualDeliveryDate`],
+    ["iban", `${UBL}/cac:PaymentMeans/cac:PayeeFinancialAccount/cbc:ID`],
+    ["vat_total", `${UBL}/cac:TaxTotal/cbc:TaxAmount`],
+    ["tax_exclusive_total", `${UBL}/cac:LegalMonetaryTotal/cbc:TaxExclusiveAmount`],
+    ["gross_total", `${UBL}/cac:LegalMonetaryTotal/cbc:TaxInclusiveAmount`],
+    ["amount_due", `${UBL}/cac:LegalMonetaryTotal/cbc:PayableAmount`],
+    ["lines", `${UBL}/cac:InvoiceLine`],
+  ],
+  cii: [
+    ["number", "rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:ID"],
+    ["issue_date", "rsm:CrossIndustryInvoice/rsm:ExchangedDocument/ram:IssueDateTime/udt:DateTimeString"],
+    ["lines", `${CII_TX}/ram:IncludedSupplyChainTradeLineItem`],
+    ["buyer_reference", `${CII_AG}/ram:BuyerReference`],
+    ["seller_name", `${CII_AG}/ram:SellerTradeParty/ram:Name`],
+    ["seller_address", `${CII_AG}/ram:SellerTradeParty/ram:PostalTradeAddress`],
+    ["seller_vat_id", `${CII_AG}/ram:SellerTradeParty/ram:SpecifiedTaxRegistration/ram:ID[@schemeID='VA']`],
+    ["buyer_name", `${CII_AG}/ram:BuyerTradeParty/ram:Name`],
+    ["po_number", `${CII_AG}/ram:BuyerOrderReferencedDocument/ram:IssuerAssignedID`],
+    ["delivery_date", `${CII_TX}/ram:ApplicableHeaderTradeDelivery/ram:ActualDeliverySupplyChainEvent/ram:OccurrenceDateTime/udt:DateTimeString`],
+    ["iban", `${CII_ST}/ram:SpecifiedTradeSettlementPaymentMeans/ram:PayeePartyCreditorFinancialAccount/ram:IBANID`],
+    ["due_date", `${CII_ST}/ram:SpecifiedTradePaymentTerms/ram:DueDateDateTime/udt:DateTimeString`],
+    ["tax_exclusive_total", `${CII_SUM}/ram:TaxBasisTotalAmount`],
+    ["vat_total", `${CII_SUM}/ram:TaxTotalAmount`],
+    ["gross_total", `${CII_SUM}/ram:GrandTotalAmount`],
+    ["amount_due", `${CII_SUM}/ram:DuePayableAmount`],
+  ],
+};
+const ADDRESS_PARTS = {
+  ubl: [["cbc:StreetName", "street"], ["cbc:CityName", "city"], ["cbc:PostalZone", "postcode"]],
+  cii: [["ram:PostcodeCode", "postcode"], ["ram:LineOne", "street"], ["ram:CityName", "city"]],
+};
+const LINE_PARTS = {
+  ubl: [["cbc:ID", "id"], ["cbc:InvoicedQuantity", "qty"], ["cbc:LineExtensionAmount", "net"],
+    ["cac:OrderLineReference/cbc:LineID", "ref"], ["cac:Item/cbc:Name", "item"],
+    ["cac:Item/cac:ClassifiedTaxCategory/cbc:Percent", "rate"], ["cac:Price/cbc:PriceAmount", "price"]],
+  cii: [["ram:AssociatedDocumentLineDocument/ram:LineID", "id"], ["ram:SpecifiedTradeProduct/ram:Name", "item"],
+    ["ram:SpecifiedLineTradeAgreement/ram:BuyerOrderReferencedDocument/ram:LineID", "ref"],
+    ["ram:SpecifiedLineTradeAgreement/ram:NetPriceProductTradePrice/ram:ChargeAmount", "price"],
+    ["ram:SpecifiedLineTradeDelivery/ram:BilledQuantity", "qty"],
+    ["ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:RateApplicablePercent", "rate"],
+    ["ram:SpecifiedLineTradeSettlement/ram:SpecifiedTradeSettlementLineMonetarySummation/ram:LineTotalAmount", "net"]],
+};
+
+// Passed-check messages as rules/engine.py writes them, in engine order.
+const PASSED_MESSAGES = [
+  ["MISSING_SELLER_NAME", () => "§14 Abs. 4 Nr. 1 seller name: present"],
+  ["MISSING_SELLER_ADDRESS", () => "§14 Abs. 4 Nr. 1 seller address: present"],
+  ["MISSING_BUYER_NAME", () => "§14 Abs. 4 Nr. 1 buyer name: present"],
+  ["MISSING_BUYER_ADDRESS", () => "§14 Abs. 4 Nr. 1 buyer address: present"],
+  ["MISSING_VAT_ID", () => "§14 Abs. 4 Nr. 2 seller USt-IdNr or Steuernummer: present"],
+  ["MISSING_ISSUE_DATE", () => "§14 Abs. 4 Nr. 3 issue date: present"],
+  ["MISSING_INVOICE_NUMBER", () => "§14 Abs. 4 Nr. 4 invoice number: present"],
+  ["MISSING_LINE_DETAILS", () => "§14 Abs. 4 Nr. 5 quantity and description of every line: present"],
+  ["MISSING_DELIVERY_DATE", () => "§14 Abs. 4 Nr. 6 delivery date or period: present"],
+  ["MISSING_VAT_BREAKDOWN", () => "§14 Abs. 4 Nr. 7-8 net amount, rate and VAT amount per rate: present"],
+  ["INVALID_VAT_ID", (inv) => `USt-IdNr ${value(inv, "seller_vat_id")} has a valid format and check digit`],
+  ["INVALID_VAT_RATE", () => "VAT rates allowed"],
+  ["LINE_NET_MISMATCH", () => "every line net = quantity x price"],
+  ["LINE_SUM_MISMATCH", () => "lines add up to BT-106"],
+  ["VAT_RATE_MISMATCH", () => "VAT per rate = rate x base"],
+  ["VAT_TOTAL_MISMATCH", () => "VAT breakdown adds up to BT-110"],
+  ["TOTALS_MISMATCH", () => "net, gross and amount due are consistent"],
+  ["DUPLICATE_INVOICE", () => "no earlier duplicate found"],
+  ["PO_LINE_NOT_FOUND", () => "every line is on the PO"],
+  ["PRICE_OUTSIDE_TOLERANCE", () => "prices within tolerance"],
+  ["QUANTITY_ABOVE_RECEIPT", () => "quantities covered by goods receipts"],
+  ["UNKNOWN_VENDOR", (inv) => `known vendor ${value(inv, "seller_name")}`],
+  ["BANK_DETAILS_CHANGED", () => "IBAN matches the master record"],
+];
+
+const invoices = INVOICES.map((inv) => ({ ...inv }));
+const state = { lang: loadLang(), filter: "all", tab: "fields", field: null, panel: null, cite: null, asking: null, upload: null, confirmed: false };
+let toastTimer = null;
+
+function loadLang() {
+  try { return localStorage.getItem("einvoice-lang") === "en" ? "en" : "de"; } catch { return "de"; }
+}
+function saveLang() {
+  try { localStorage.setItem("einvoice-lang", state.lang); } catch { /* storage blocked: the toggle still works for this visit */ }
+}
+function esc(text) {
+  return String(text).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+function t(key, vars = {}) {
+  const entry = STRINGS[key];
+  if (!entry) { console.error(`missing string ${key}`); return key; }
+  return entry[state.lang].replace(/\{(\w+)\}/g, (_, name) => vars[name] ?? "");
+}
+const h = (key, vars) => esc(t(key, vars));
+const locale = () => (state.lang === "de" ? "de-DE" : "en-GB");
+
+function money(amount, lang = state.lang) {
+  return new Intl.NumberFormat(lang === "de" ? "de-DE" : "en-GB", { style: "currency", currency: "EUR" }).format(Number(amount));
+}
+function day(iso, lang = state.lang) {
+  if (lang === "en") return iso;
+  const [y, m, d] = iso.split("-");
+  return `${d}.${m}.${y}`;
+}
+function share(p) {
+  return new Intl.NumberFormat(locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(p);
+}
+function address(a) { return `${a.street}, ${a.postcode} ${a.city}`; }
+function value(inv, name) { return inv.fields[name] ? inv.fields[name][0] : null; }
+function shown(name, v, lang = state.lang) {
+  if (MONEY_FIELDS.includes(name)) return money(v, lang);
+  if (DATE_FIELDS.includes(name)) return day(v, lang);
+  if (name === "seller_address") return address(v);
+  return v;
+}
+// The quote as printed on the German page: what extraction stores as evidence.
+const printed = (name, v) => shown(name, v, "de");
+
+function cents(text) {
+  const plain = text.trim().includes(",") ? text.trim().replace(/\./g, "").replace(",", ".") : text.trim();
+  if (!/^\d+(\.\d{1,2})?$/.test(plain)) return null;
+  const [whole, frac = ""] = plain.split(".");
+  return Number(whole) * 100 + Number(frac.padEnd(2, "0"));
+}
+const fromCents = (c) => (c / 100).toFixed(2);
+
+function isDone(inv) { return ["approved", "corrected", "rejected"].includes(inv.status); }
+function byNewest(a, b) { return b.received.localeCompare(a.received) || b.id - a.id; }
+function findInvoice(id) { return invoices.find((inv) => inv.id === id); }
+function reasonLabel(code) { return h(`reason_${code}`); }
+
+function weakRequired(inv) {
+  return REQUIRED_EXTRACTED.filter((name) => inv.fields[name] && inv.fields[name][1] < EXTRACT_THRESHOLD);
+}
+function reasonDetail(inv, code) {
+  const failed = inv.failed.find((f) => f.code === code);
+  if (failed) return failed.message;
+  if (code === "LOW_EXTRACTION_CONFIDENCE") {
+    return weakRequired(inv).map((name) => `${t(`field_${name}`)} ${share(inv.fields[name][1])}`).join(" · ");
+  }
+  if (code === "LOW_GL_CONFIDENCE") {
+    return `${inv.gl[0]} ${SKR03[inv.gl[0]]}: ${share(inv.gl[1])} < ${share(GL_THRESHOLD)}`;
+  }
+  return "";
+}
+
+/* ---------- shell ---------- */
+
+function route() {
+  const hash = location.hash.slice(1);
+  let match = hash.match(/^invoice-(\d+)$/);
+  if (match && findInvoice(Number(match[1]))) return { view: "invoice", id: Number(match[1]) };
+  match = hash.match(/^review-(\d+)$/);
+  if (match && findInvoice(Number(match[1]))) return { view: "reviews", id: Number(match[1]) };
+  if (hash === "reviews") return { view: "reviews", id: null };
+  return { view: "inbox", id: null };
+}
+
+function render() {
+  document.documentElement.lang = state.lang;
+  document.querySelectorAll("[data-s]").forEach((node) => { node.textContent = t(node.dataset.s); });
+  document.getElementById("lang").textContent = t("lang_toggle");
+  const current = route();
+  const open = invoices.filter((inv) => inv.status === "open").length;
+  document.getElementById("nav").innerHTML = `
+    <a href="#inbox" ${current.view !== "reviews" ? 'aria-current="page"' : ""}>${h("nav_inbox")}</a>
+    <a href="#reviews" ${current.view === "reviews" ? 'aria-current="page"' : ""}>${h("nav_reviews")}${open ? `<span class="count">${open}</span>` : ""}</a>`;
+  const view = document.getElementById("view");
+  if (current.view === "invoice") view.innerHTML = invoiceView(findInvoice(current.id));
+  else if (current.view === "reviews") view.innerHTML = reviewsView(current.id);
+  else view.innerHTML = inboxView();
+  const marked = view.querySelector(".xml .on");
+  if (marked) {
+    const pane = marked.closest(".xml");
+    pane.scrollTop = marked.offsetTop - pane.clientHeight / 2;
+  }
+}
+
+function statusChip(inv) {
+  return `<span class="chip dot ${STATUS_TONE[inv.status]}">${h(`status_${inv.status}`)}</span>`;
+}
+function formatChip(inv) { return `<span class="fmt">${h(`format_${inv.format}`)}</span>`; }
+
+/* ---------- inbox ---------- */
+
+function inboxView() {
+  const total = invoices.length;
+  const auto = invoices.filter((inv) => inv.status === "auto_booked").length;
+  const open = invoices.filter((inv) => inv.status === "open").length;
+  const shownRows = invoices
+    .filter((inv) => state.filter === "all" || (state.filter === "open" ? inv.status === "open" : inv.status !== "open"))
+    .sort(byNewest);
+  const filters = ["all", "open", "done"].map((f) =>
+    `<button type="button" data-action="filter" data-filter="${f}" aria-pressed="${state.filter === f}">${h(`filter_${f}`)}</button>`).join("");
+  const rows = shownRows.map((inv) => {
+    const reasons = inv.reasons.length
+      ? `${reasonLabel(inv.reasons[0])}${inv.reasons.length > 1 ? ` <span class="muted">+${inv.reasons.length - 1}</span>` : ""}`
+      : "";
+    return `<tr data-action="go" data-href="#invoice-${inv.id}">
+      <td class="num">${esc(day(inv.received))}</td>
+      <td><a href="#invoice-${inv.id}">${esc(value(inv, "seller_name"))}</a></td>
+      <td class="mono">${esc(value(inv, "number"))}</td>
+      <td class="hide-narrow">${formatChip(inv)}</td>
+      <td class="num">${esc(money(value(inv, "gross_total")))}</td>
+      <td>${statusChip(inv)}</td>
+      <td class="hide-narrow">${reasons}</td>
+    </tr>`;
+  }).join("");
+  return `<div class="stack">
+    <div class="row spread">
+      <div class="stack" style="gap:4px">
+        <h1>${h("inbox_title")}</h1>
+        <p class="muted">${h("inbox_summary", { total, auto, open })}</p>
+      </div>
+      <div class="stack" style="gap:4px;justify-items:end">
+        <label class="btn primary" for="upload">${h("upload")}</label>
+        <input type="file" id="upload" hidden accept=".xml,.pdf,.png,.jpg,.jpeg,.tif,.tiff">
+        <span class="muted" style="font-size:var(--t-xs)">${h("upload_hint")}</span>
+      </div>
+    </div>
+    ${state.upload ? uploadProgress() : ""}
+    <div class="filters">${filters}</div>
+    <div class="table-wrap">
+      <table class="ledger">
+        <thead><tr>
+          <th class="num">${h("col_received")}</th><th>${h("col_seller")}</th><th>${h("col_number")}</th>
+          <th class="hide-narrow">${h("col_format")}</th><th class="num">${h("col_gross")}</th>
+          <th>${h("col_status")}</th><th class="hide-narrow">${h("col_reasons")}</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function uploadProgress() {
+  const steps = ["upload_step_detect", "upload_step_read", "upload_step_check", "upload_step_decide"];
+  return `<div class="progress" role="status"><strong class="mono">${esc(state.upload.name)}</strong><ol>${steps.map((key, i) =>
+    `<li class="${i < state.upload.step ? "done" : i === state.upload.step ? "now" : ""}">${i < state.upload.step ? "✓ " : ""}${h(key)}</li>`).join("")}</ol></div>`;
+}
+
+function startUpload(file) {
+  state.upload = { name: file.name, step: 0 };
+  render();
+  const tick = () => {
+    state.upload.step += 1;
+    if (state.upload.step < 4) { render(); setTimeout(tick, 450); return; }
+    if (!findInvoice(UPLOAD_SAMPLE.id)) invoices.push({ ...UPLOAD_SAMPLE });
+    state.upload = null;
+    render();
+    toast(t("upload_done", { number: value(UPLOAD_SAMPLE, "number") }));
+  };
+  setTimeout(tick, 450);
+}
+
+/* ---------- invoice view ---------- */
+
+function invoiceView(inv) {
+  const structured = STRUCTURED.includes(inv.format);
+  const reasonChips = inv.reasons.map((code) => `<span class="chip warn">${reasonLabel(code)}</span>`).join(" ");
+  return `<div class="stack" style="gap:20px">
+    <a href="#inbox">← ${h("back_to_inbox")}</a>
+    <div class="inv-head">
+      <div class="stack" style="gap:6px">
+        <div class="row">${formatChip(inv)} ${statusChip(inv)}</div>
+        <h1>${esc(value(inv, "seller_name"))}</h1>
+        <p class="mono muted">${esc(value(inv, "number"))} · ${esc(money(value(inv, "gross_total")))}</p>
+        ${inv.reasons.length ? `<div class="row">${reasonChips}</div>` : ""}
+      </div>
+      <div class="stack" style="gap:12px;justify-items:end">
+        <span class="stamp">${h("col_received")} ${esc(day(inv.received, "de"))}</span>
+        ${inv.status === "open" ? `<a class="btn primary" href="#review-${inv.id}">${h("open_review")}</a>` : ""}
+      </div>
+    </div>
+    <div class="tabs" role="tablist">
+      ${["fields", "checks"].map((tab) => `<button type="button" role="tab" data-action="tab" data-tab="${tab}" aria-selected="${state.tab === tab}">${h(`tab_${tab}`)}${tab === "checks" && inv.reasons.length ? ` <span class="chip warn">${inv.reasons.length}</span>` : ""}</button>`).join("")}
+    </div>
+    <div class="split">
+      <div class="doc">
+        <div class="doc-label"><h3>${structured ? h("document_xml") : h("document_page", { page: 1 })}</h3><span class="muted" style="font-size:var(--t-xs)">${h("evidence_hint")}</span></div>
+        ${structured ? xmlDocument(inv) : pageDocument(inv)}
+      </div>
+      <div>${state.tab === "fields" ? fieldsPanel(inv, structured) : checksPanel(inv, structured)}</div>
+    </div>
+  </div>`;
+}
+
+function fieldsPanel(inv, structured) {
+  const paths = Object.fromEntries(XML_PATHS[inv.format === "ubl" ? "ubl" : "cii"]);
+  const groups = FIELD_GROUPS.map(([group, names]) => {
+    const rows = names.map((name) => {
+      const field = inv.fields[name];
+      const label = `<div class="label"><span>${h(`field_${name}`)}</span><span class="bt">${FIELD_BT[name]}</span></div>`;
+      if (!field) {
+        return `<tr data-action="field" data-field="${name}"><td>${label}</td><td><span class="missing">${h("missing")}</span></td><td class="ev-cell">–</td><td></td></tr>`;
+      }
+      const [v, confidence] = field;
+      const evidence = structured
+        ? `<span title="/${esc(paths[name])}">…/${esc(paths[name].split("/").slice(-2).join("/"))}</span>`
+        : `<span title="${esc(printed(name, v))}">${h("evidence_page", { page: 1 })} »${esc(printed(name, v))}«</span>`;
+      const low = confidence < EXTRACT_THRESHOLD;
+      const conf = structured
+        ? `<span class="muted">${h("from_xml")}</span>`
+        : `<span class="conf"><span class="meter ${low ? "low" : ""}"><span style="width:${confidence * 100}%"></span></span><span class="${low ? "low-text" : ""}">${share(confidence)}</span></span>`;
+      return `<tr data-action="field" data-field="${name}" class="${state.field === name ? "on" : ""}" ${low ? `title="${h("below_threshold", { threshold: share(EXTRACT_THRESHOLD) })}"` : ""}>
+        <td>${label}</td><td>${esc(shown(name, v))}</td><td class="ev-cell">${evidence}</td><td>${conf}</td></tr>`;
+    }).join("");
+    return `<section class="stack" style="gap:8px"><h3>${h(group)}</h3>
+      <div class="table-wrap"><table class="ledger"><thead><tr><th>${h("col_field")}</th><th>${h("col_value")}</th><th>${h("col_evidence")}</th><th>${h("col_confidence")}</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+  }).join("");
+  return `<div class="fields">${groups}${linesTable(inv)}</div>`;
+}
+
+function linesTable(inv) {
+  const rows = inv.lines.map((line) => `<tr><td>${esc(line.id)}</td><td>${esc(line.item)}</td><td class="num">${esc(line.qty)}</td><td class="num">${esc(money(line.price))}</td><td class="num">${esc(line.rate)} %</td><td class="num">${esc(money(line.net))}</td></tr>`).join("");
+  return `<section class="stack" style="gap:8px"><h3>${h("group_lines")}</h3><div class="table-wrap"><table class="ledger">
+    <thead><tr><th>#</th><th>${h("col_item")}</th><th class="num">${h("col_quantity")}</th><th class="num">${h("col_price")}</th><th class="num">${h("col_vat_rate")}</th><th class="num">${h("col_net")}</th></tr></thead>
+    <tbody>${rows}</tbody></table></div></section>`;
+}
+
+function checksPanel(inv, structured) {
+  const failed = inv.reasons.map((code) => `<li><span class="chip bad">${h("severity_error")}</span><strong>${reasonLabel(code)}</strong><span class="msg">${esc(reasonDetail(inv, code))}</span></li>`).join("");
+  const failedCodes = inv.failed.map((f) => f.code);
+  const skipped = new Set();
+  if (failedCodes.includes("UNKNOWN_VENDOR")) skipped.add("BANK_DETAILS_CHANGED");
+  if (failedCodes.includes("NO_PO_REFERENCE") || failedCodes.includes("PO_NOT_FOUND")) {
+    ["PO_LINE_NOT_FOUND", "PRICE_OUTSIDE_TOLERANCE", "QUANTITY_ABOVE_RECEIPT"].forEach((code) => skipped.add(code));
+  }
+  const passed = PASSED_MESSAGES.filter(([code]) => !failedCodes.includes(code) && !skipped.has(code));
+  const kosit = !structured ? h("kosit_not_applicable")
+    : `<span class="chip dot ${inv.kosit ? "ok" : "bad"}">${h(inv.kosit ? "kosit_accepted" : "kosit_rejected")}</span>`;
+  const glLow = inv.gl[1] < GL_THRESHOLD;
+  return `<div class="stack" style="gap:20px">
+    <section class="stack" style="gap:8px">
+      <h3>${h("decision")}</h3>
+      <div class="row"><span class="chip dot ${inv.reasons.length ? "warn" : "ok"}">${h(inv.reasons.length ? "decision_review" : "decision_auto_book")}</span></div>
+    </section>
+    <section class="stack" style="gap:8px">
+      <h3>${h("checks_failed")}</h3>
+      ${failed ? `<ul class="checklist">${failed}</ul>` : `<p>${h("checks_all_passed")}</p>`}
+    </section>
+    <dl class="kv">
+      <dt>${h("kosit")}</dt><dd>${kosit}</dd>
+      <dt>${h("gl_suggestion")}</dt>
+      <dd class="gl"><strong class="mono">${esc(inv.gl[0])}</strong> ${esc(SKR03[inv.gl[0]])}
+        <span class="meter ${glLow ? "low" : ""}"><span style="width:${inv.gl[1] * 100}%"></span></span>
+        <span class="${glLow ? "low-text" : "muted"}">${h("gl_probability", { p: share(inv.gl[1]) })}</span></dd>
+    </dl>
+    ${inv.po ? poTable(inv) : ""}
+    <details class="passed"><summary>${h("checks_passed")}: ${passed.length}</summary>
+      <ul>${passed.map(([, message]) => `<li>${esc(message(inv))}</li>`).join("")}</ul></details>
+  </div>`;
+}
+
+function poTable(inv) {
+  const rows = inv.lines.map((line) => {
+    const ordered = inv.po.lines.find((po) => po.id === line.ref);
+    return `<tr><td>${esc(line.item)}</td>
+      <td class="num">${esc(line.qty)} × ${esc(money(line.price))}</td>
+      <td class="num">${ordered ? `${esc(ordered.qty)} × ${esc(money(ordered.price))}` : "–"}</td>
+      <td class="num">${ordered && ordered.received !== null ? esc(ordered.received) : "–"}</td></tr>`;
+  }).join("");
+  return `<section class="stack" style="gap:8px"><h3>${h("po_match", { po: inv.po.number })}</h3><div class="table-wrap"><table class="ledger">
+    <thead><tr><th>${h("col_item")}</th><th class="num">${h("col_invoiced")}</th><th class="num">${h("col_ordered")}</th><th class="num">${h("col_received_qty")}</th></tr></thead>
+    <tbody>${rows}</tbody></table></div></section>`;
+}
+
+/* ---------- document pane ---------- */
+
+function xmlDocument(inv) {
+  const syntax = inv.format === "ubl" ? "ubl" : "cii";
+  const root = { kids: [] };
+  const add = (path, leaf) => {
+    let node = root;
+    path.split("/").forEach((seg, i, segs) => {
+      const isLeaf = i === segs.length - 1;
+      let kid = isLeaf ? null : node.kids.find((k) => k.seg === seg);
+      if (!kid) { kid = { seg, kids: [] }; node.kids.push(kid); }
+      node = kid;
+    });
+    Object.assign(node, leaf);
+  };
+  for (const [name, path] of XML_PATHS[syntax]) {
+    if (name === "lines") {
+      inv.lines.forEach((line, n) => LINE_PARTS[syntax].forEach(([part, key]) => {
+        if (line[key] !== null) add(`${path}#${n}/${part}`, { text: line[key] });
+      }));
+      continue;
+    }
+    const field = inv.fields[name];
+    if (!field) continue;
+    if (name === "seller_address") {
+      ADDRESS_PARTS[syntax].forEach(([part, key]) => add(`${path}/${part}`, { text: field[0][key], field: name }));
+      continue;
+    }
+    const raw = DATE_FIELDS.includes(name) && syntax === "cii" ? field[0].replaceAll("-", "") : field[0];
+    add(path, { text: raw, field: name });
+  }
+  const line = (depth, inner, leaf) => `<div class="x-line${leaf ? ` x-ev${state.field === leaf ? " on" : ""}" data-action="field" data-field="${leaf}` : ""}">${"  ".repeat(depth)}${inner}</div>`;
+  const draw = (node, depth) => {
+    const tag = node.seg.replace(/#\d+/, "").replace(/\[.*\]$/, "");
+    const attr = node.seg.match(/\[@(\w+)='([^']+)'\]/);
+    let attrs = attr ? ` <span class="x-attr">${attr[1]}="${attr[2]}"</span>` : "";
+    if (tag === "udt:DateTimeString") attrs += ' <span class="x-attr">format="102"</span>';
+    if (/Amount$/.test(tag) && syntax === "ubl") attrs += ' <span class="x-attr">currencyID="EUR"</span>';
+    const open = `<span class="x-tag">&lt;${esc(tag)}</span>${attrs}<span class="x-tag">&gt;</span>`;
+    const close = `<span class="x-tag">&lt;/${esc(tag)}&gt;</span>`;
+    if (node.text !== undefined) return line(depth, `${open}<span class="x-text">${esc(node.text)}</span>${close}`, node.field);
+    return line(depth, open) + node.kids.map((kid) => draw(kid, depth + 1)).join("") + line(depth, close);
+  };
+  return `<div class="xml">${root.kids.map((kid) => draw(kid, 0)).join("")}</div>`;
+}
+
+function pageDocument(inv) {
+  const mark = (name) => {
+    const field = inv.fields[name];
+    if (!field) return "";
+    return `<span class="ev${state.field === name ? " on" : ""}" data-action="field" data-field="${name}">${esc(printed(name, field[0]))}</span>`;
+  };
+  const vendorLine = `${value(inv, "seller_name")} · ${address(value(inv, "seller_address"))}`;
+  const lines = inv.lines.map((line) => `<tr><td>${esc(line.id)}</td><td>${esc(line.item)}</td><td class="r">${esc(line.qty)}</td><td class="r">${esc(money(line.price, "de"))}</td><td class="r">${esc(money(line.net, "de"))}</td></tr>`).join("");
+  const meta = [
+    ["Rechnungsnummer", "number"], ["Rechnungsdatum", "issue_date"], ["Lieferdatum", "delivery_date"], ["Ihre Bestellung", "po_number"],
+  ].filter(([, name]) => inv.fields[name]).map(([label, name]) => `<dt>${label}</dt><dd>${mark(name)}</dd>`).join("");
+  const vatId = inv.fields.seller_vat_id ? ` · USt-IdNr. ${mark("seller_vat_id")}` : "";
+  return `<div class="page${inv.format === "scan" ? " scan" : ""}">
+    <div class="pg-head"><div><strong>${mark("seller_name")}</strong><br>${mark("seller_address")}</div><div class="pg-logo" aria-hidden="true"></div></div>
+    <div class="pg-window"><small>${esc(vendorLine)}</small><br>${mark("buyer_name")}<br>${esc(BUYER.street)}<br>${esc(`${BUYER.postcode} ${BUYER.city}`)}</div>
+    <h4 class="pg-title">Rechnung</h4>
+    <dl class="pg-meta">${meta}</dl>
+    <table class="pg-lines"><thead><tr><th>Pos.</th><th>Bezeichnung</th><th class="r">Menge</th><th class="r">Einzelpreis</th><th class="r">Gesamt</th></tr></thead><tbody>${lines}</tbody></table>
+    <table class="pg-totals"><tbody>
+      <tr><td>Nettobetrag</td><td>${mark("tax_exclusive_total")}</td></tr>
+      <tr><td>zzgl. ${esc(inv.lines[0].rate)} % USt</td><td>${mark("vat_total")}</td></tr>
+      <tr class="sum"><td>Rechnungsbetrag</td><td>${mark("gross_total")}</td></tr>
+      <tr><td>Zahlbetrag</td><td>${mark("amount_due")}</td></tr>
+    </tbody></table>
+    <p>Zahlbar ohne Abzug bis ${mark("due_date")}.</p>
+    <div class="pg-foot">${esc(value(inv, "seller_name"))}${vatId} · IBAN ${mark("iban")}</div>
+  </div>`;
+}
+
+/* ---------- review queue ---------- */
+
+function reviewsView(id) {
+  const open = invoices.filter((inv) => inv.status === "open").sort(byNewest);
+  const done = invoices.filter(isDone).sort(byNewest);
+  const selected = id ? findInvoice(id) : null;
+  const item = (inv) => `<li><a href="#review-${inv.id}" ${inv.id === id ? 'aria-current="true"' : ""}>
+      <span class="q-top"><span>${esc(value(inv, "seller_name"))}</span><span class="num">${esc(money(value(inv, "gross_total")))}</span></span>
+      <span class="q-sub"><span class="mono">${esc(value(inv, "number"))}</span>${inv.reasons.slice(0, 2).map((code) => `<span class="chip warn">${reasonLabel(code)}</span>`).join("")}</span>
+      <span class="q-sub">${inv.status === "open"
+        ? (inv.proposal ? `<span class="chip ${ACTION_TONE[inv.proposal.action]}">${h(`action_${inv.proposal.action}`)}</span>` : `<span class="muted">${h("agent_none")}</span>`)
+        : statusChip(inv)}</span>
+    </a></li>`;
+  return `<div class="reviews ${selected ? "has-case" : ""}">
+    <aside class="queue">
+      <h1>${h("reviews_title")}</h1>
+      <p class="muted">${h("reviews_summary", { open: open.length, done: done.length })}</p>
+      ${open.length ? `<ul>${open.map(item).join("")}</ul>` : `<p class="empty">${h("reviews_empty")}</p>`}
+      ${done.length ? `<h3>${h("filter_done")}</h3><ul>${done.map(item).join("")}</ul>` : ""}
+    </aside>
+    <div class="case">${selected ? caseView(selected) : `<p class="empty">${h("select_case")}</p>`}</div>
+  </div>`;
+}
+
+function caseView(inv) {
+  const vendor = inv.vendor ? VENDORS[inv.vendor] : null;
+  const reasons = inv.reasons.map((code) => `<li><strong>${reasonLabel(code)}</strong><span class="mono muted" style="font-size:var(--t-xs)">${esc(reasonDetail(inv, code))}</span></li>`).join("");
+  const ibanCompare = inv.reasons.includes("BANK_DETAILS_CHANGED") ? `<div class="compare">
+      <div class="changed"><span>${h("iban_on_invoice")}</span><code>${esc(value(inv, "iban"))}</code></div>
+      <div><span>${h("master_iban")}</span><code>${esc(vendor.iban)}</code></div></div>` : "";
+  return `<a class="back-mobile" href="#reviews">← ${h("back_to_reviews")}</a>
+    <header class="row spread" style="align-items:flex-start">
+      <div class="stack" style="gap:6px">
+        <div class="row">${formatChip(inv)}<span class="muted">${h("col_received")} ${esc(day(inv.received))}</span></div>
+        <h2>${esc(value(inv, "seller_name"))}</h2>
+        <p class="mono muted">${esc(value(inv, "number"))} · ${esc(money(value(inv, "gross_total")))}</p>
+      </div>
+      <a class="btn" href="#invoice-${inv.id}">${h("view_invoice")}</a>
+    </header>
+    <section><h3>${h("why_review")}</h3><ul class="reasons">${reasons}</ul>${ibanCompare}</section>
+    <section><h3>${h("agent_proposal")}</h3>${proposalView(inv)}</section>
+    <section><h3>${h("vendor_history")}</h3>${historyTable(inv)}</section>
+    ${inv.status !== "open" ? doneBanner(inv) : inv.proposal ? decideView(inv) : ""}`;
+}
+
+function proposalView(inv) {
+  if (state.asking === inv.id) return `<div class="card"><p class="thinking">${h("agent_asking")}</p></div>`;
+  const proposal = inv.proposal;
+  if (!proposal) {
+    return `<div class="card"><p class="muted">${h("agent_none")}</p>
+      ${inv.status === "open" && inv.askResult ? `<div><button class="btn primary" type="button" data-action="ask">${h("agent_ask")}</button></div>` : ""}</div>`;
+  }
+  const overruled = proposal.reasons.length
+    ? `<p class="guard">${proposal.reasons.map((code) => h("guardrail_overruled", { reason: t(`reason_${code}`) })).join("<br>")}</p>` : "";
+  const cites = proposal.citations.map((source) =>
+    `<button type="button" data-action="cite" data-source="${esc(source)}" aria-expanded="${state.cite === source}">${esc(source)}</button>`).join("");
+  const chunk = state.cite && proposal.citations.includes(state.cite)
+    ? `<p class="chunk">${RULE_CHUNKS[state.cite] ? esc(RULE_CHUNKS[state.cite]) : h("citation_statute_note")}</p>` : "";
+  const account = proposal.gl_account ? `<p><span class="muted">${h("field_gl_account")}:</span> <strong class="mono">${esc(proposal.gl_account)}</strong> ${esc(SKR03[proposal.gl_account])}</p>` : "";
+  const mail = proposal.vendor_email_de ? `<div class="stack" style="gap:6px">
+      <div class="row spread"><strong>${h("vendor_email")}</strong><button class="btn small" type="button" data-action="copy">${h("copy")}</button></div>
+      <pre class="mail" id="mail">${esc(proposal.vendor_email_de)}</pre>
+      <p class="note">${h("vendor_email_note")}</p></div>` : "";
+  return `<div class="card">
+    <div class="row"><span class="chip dot ${ACTION_TONE[proposal.action]}">${h(`action_${proposal.action}`)}</span></div>
+    ${overruled}
+    <div class="stack" style="gap:4px"><span class="muted" style="font-size:var(--t-xs)">${h("agent_explanation_lang")}</span><p class="explain">${esc(proposal.explanation)}</p></div>
+    ${proposal.citations.length ? `<div class="cites"><span class="muted" style="font-size:var(--t-xs)">${h("citations")}:</span>${cites}</div>${chunk}` : ""}
+    ${account}
+    ${mail}
+    <p class="note">${h("agent_note")}</p>
+  </div>`;
+}
+
+function historyTable(inv) {
+  if (!inv.history.length) return `<p class="muted">${h("vendor_history_none")}</p>`;
+  const rows = inv.history.map((prior) => `<tr><td class="mono">${esc(prior.number)}</td><td class="num">${esc(day(prior.date))}</td><td class="num">${esc(money(prior.gross))}</td><td class="mono">${esc(prior.gl)} <span class="muted" style="font-family:var(--font-ui)">${esc(SKR03[prior.gl])}</span></td></tr>`).join("");
+  return `<div class="table-wrap"><table class="ledger"><thead><tr><th>${h("col_number")}</th><th class="num">${h("field_issue_date")}</th><th class="num">${h("col_gross")}</th><th>${h("field_gl_account")}</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function bookingAccount(inv) { return (inv.proposal && inv.proposal.gl_account) || inv.gl[0]; }
+
+function decideView(inv) {
+  const buttons = `<div class="row">
+      <button class="btn primary" type="button" data-action="panel" data-panel="approve" aria-expanded="${state.panel === "approve"}">${h("btn_approve")}</button>
+      <button class="btn" type="button" data-action="panel" data-panel="correct" aria-expanded="${state.panel === "correct"}">${h("btn_correct")}</button>
+      <button class="btn danger" type="button" data-action="panel" data-panel="reject" aria-expanded="${state.panel === "reject"}">${h("btn_reject")}</button>
+    </div>`;
+  const panels = { approve: approvePanel, correct: correctPanel, reject: rejectPanel };
+  return `<section class="decide"><h3>${h("your_decision")}</h3>${state.panel ? panels[state.panel](inv) : buttons}</section>`;
+}
+
+function approvePanel(inv) {
+  const account = bookingAccount(inv);
+  const against = inv.proposal && inv.proposal.action !== "approve_booking"
+    ? `<p class="warnline">${h("approve_against_agent", { action: t(`action_${inv.proposal.action}`) })}</p>` : "";
+  const needsConfirm = inv.reasons.includes("BANK_DETAILS_CHANGED");
+  const confirm = needsConfirm ? `<label class="check"><input type="checkbox" id="iban-confirmed" ${state.confirmed ? "checked" : ""}> <span>${h("iban_confirmed")}</span></label>` : "";
+  return `<div class="panel">
+    <strong>${h("approve_confirm")}</strong>
+    <dl class="kv">
+      <dt>${h("field_gl_account")}</dt><dd><strong class="mono">${esc(account)}</strong> ${esc(SKR03[account])}</dd>
+      <dt>${h("field_tax_exclusive_total")}</dt><dd class="num" style="text-align:left">${esc(money(value(inv, "tax_exclusive_total")))}</dd>
+      <dt>${h("field_vat_total")}</dt><dd class="num" style="text-align:left">${esc(money(value(inv, "vat_total")))}</dd>
+      <dt>${h("field_gross_total")}</dt><dd class="num" style="text-align:left">${esc(money(value(inv, "gross_total")))}</dd>
+      <dt>${h("field_due_date")}</dt><dd>${esc(day(value(inv, "due_date")))}</dd>
+    </dl>
+    ${against}${confirm}
+    <div class="row">
+      <button class="btn primary" type="button" data-action="approve" id="approve-btn" ${needsConfirm && !state.confirmed ? "disabled" : ""}>${h("approve_book")}</button>
+      <button class="btn" type="button" data-action="cancel">${h("btn_cancel")}</button>
+    </div>
+  </div>`;
+}
+
+const CORRECTABLE = ["gl_account", "tax_exclusive_total", "vat_total", "gross_total", "due_date"];
+
+function originals(inv) {
+  return {
+    gl_account: bookingAccount(inv),
+    tax_exclusive_total: value(inv, "tax_exclusive_total"),
+    vat_total: value(inv, "vat_total"),
+    gross_total: value(inv, "gross_total"),
+    due_date: value(inv, "due_date"),
+  };
+}
+
+function correctPanel(inv) {
+  const before = originals(inv);
+  const options = Object.entries(SKR03).map(([account, name]) =>
+    `<option value="${account}" ${account === before.gl_account ? "selected" : ""}>${account} ${esc(name)}</option>`).join("");
+  const input = (name) => `<label>${h(`field_${name}`)}<input id="c-${name}" data-correct="${name}" inputmode="decimal" value="${esc(before[name].replace(".", state.lang === "de" ? "," : "."))}"></label>`;
+  return `<div class="panel">
+    <strong>${h("correct_title")}</strong>
+    <p class="note">${h("correct_note")}</p>
+    <div class="form-grid">
+      <label>${h("field_gl_account")}<select id="c-gl_account" data-correct="gl_account">${options}</select></label>
+      ${input("tax_exclusive_total")}${input("vat_total")}${input("gross_total")}
+      <label>${h("field_due_date")}<input id="c-due_date" data-correct="due_date" type="date" value="${esc(before.due_date)}"></label>
+    </div>
+    <p id="correct-status" class="note" aria-live="polite"></p>
+    <div class="row">
+      <button class="btn primary" type="button" data-action="correct" id="correct-btn" disabled>${h("correct_save")}</button>
+      <button class="btn" type="button" data-action="cancel">${h("btn_cancel")}</button>
+    </div>
+  </div>`;
+}
+
+// The corrections rows (field, old, new) the form would store, or an error.
+function readCorrections(inv) {
+  const before = originals(inv);
+  const after = {};
+  for (const name of CORRECTABLE) {
+    const raw = document.getElementById(`c-${name}`).value;
+    after[name] = MONEY_FIELDS.includes(name) ? cents(raw) : raw;
+  }
+  if (MONEY_FIELDS.some((name) => after[name] === null)) return { error: t("correct_sum_error", { sum: "?", gross: "?" }) };
+  const sum = after.tax_exclusive_total + after.vat_total;
+  if (sum !== after.gross_total) {
+    return { error: t("correct_sum_error", { sum: money(fromCents(sum)), gross: money(fromCents(after.gross_total)) }) };
+  }
+  const changes = CORRECTABLE
+    .map((name) => ({ field: name, old: before[name], new: MONEY_FIELDS.includes(name) ? fromCents(after[name]) : after[name] }))
+    .filter((change) => change.old !== change.new);
+  return { changes };
+}
+
+function updateCorrectForm(inv) {
+  const result = readCorrections(inv);
+  const status = document.getElementById("correct-status");
+  const before = originals(inv);
+  CORRECTABLE.forEach((name) => {
+    const node = document.getElementById(`c-${name}`);
+    const now = MONEY_FIELDS.includes(name) ? (cents(node.value) === null ? null : fromCents(cents(node.value))) : node.value;
+    node.classList.toggle("changed", now !== before[name]);
+  });
+  if (result.error) { status.textContent = result.error; status.className = "error"; }
+  else if (!result.changes.length) { status.textContent = t("correct_nothing"); status.className = "note"; }
+  else { status.textContent = t("correct_changes", { n: result.changes.length }); status.className = "warnline"; }
+  document.getElementById("correct-btn").disabled = Boolean(result.error) || !result.changes.length;
+}
+
+function rejectPanel(inv) {
+  const mailHint = inv.proposal && inv.proposal.vendor_email_de ? `<p class="note">${h("reject_email_hint")}</p>` : "";
+  return `<div class="panel">
+    <strong>${h("reject_confirm")}</strong>
+    ${mailHint}
+    <div class="row">
+      <button class="btn danger solid" type="button" data-action="reject">${h("reject_now")}</button>
+      <button class="btn" type="button" data-action="cancel">${h("btn_cancel")}</button>
+    </div>
+  </div>`;
+}
+
+function doneBanner(inv) {
+  const bad = inv.status === "rejected";
+  const account = inv.booking ? inv.booking.account : bookingAccount(inv);
+  return `<div class="done-banner ${bad ? "bad" : ""}"><span>${h(`decided_${inv.status}`)}</span>
+    <span>${esc(day(inv.decided))}</span>${bad ? "" : `<span class="mono">${esc(account)} ${esc(SKR03[account])}</span>`}</div>`;
+}
+
+function decide(inv, status, booking) {
+  inv.status = status;
+  inv.decided = TODAY;
+  inv.booking = booking;
+  state.panel = null;
+  state.confirmed = false;
+  render();
+  const number = value(inv, "number");
+  if (status === "approved") toast(t("toast_approved", { number, account: booking.account }));
+  if (status === "corrected") toast(t("toast_corrected", { number, n: booking.changes }));
+  if (status === "rejected") toast(t("toast_rejected", { number }));
+}
+
+function toast(message) {
+  const node = document.getElementById("toast");
+  node.textContent = message;
+  node.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { node.hidden = true; }, 3200);
+}
+
+function copyMail(button) {
+  const text = document.getElementById("mail").textContent;
+  const done = () => { button.textContent = t("copied"); };
+  const fallback = () => {
+    const range = document.createRange();
+    range.selectNodeContents(document.getElementById("mail"));
+    const selection = getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  };
+  if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, fallback);
+  else fallback();
+}
+
+/* ---------- events ---------- */
+
+document.addEventListener("click", (event) => {
+  const target = event.target.closest("[data-action]");
+  if (!target) return;
+  const current = route();
+  const inv = current.id ? findInvoice(current.id) : null;
+  const action = target.dataset.action;
+  if (action === "go") {
+    if (event.target.closest("a")) return;
+    location.hash = target.dataset.href;
+  } else if (action === "lang") {
+    state.lang = state.lang === "de" ? "en" : "de";
+    saveLang();
+    render();
+  } else if (action === "filter") {
+    state.filter = target.dataset.filter;
+    render();
+  } else if (action === "tab") {
+    state.tab = target.dataset.tab;
+    render();
+  } else if (action === "field") {
+    state.field = state.field === target.dataset.field ? null : target.dataset.field;
+    render();
+  } else if (action === "cite") {
+    state.cite = state.cite === target.dataset.source ? null : target.dataset.source;
+    render();
+  } else if (action === "copy") {
+    copyMail(target);
+  } else if (action === "ask") {
+    state.asking = inv.id;
+    render();
+    setTimeout(() => { inv.proposal = inv.askResult; state.asking = null; render(); }, 1400);
+  } else if (action === "panel") {
+    state.panel = target.dataset.panel;
+    render();
+    if (state.panel === "correct") updateCorrectForm(inv);
+  } else if (action === "cancel") {
+    state.panel = null;
+    state.confirmed = false;
+    render();
+  } else if (action === "approve") {
+    decide(inv, "approved", { account: bookingAccount(inv) });
+  } else if (action === "correct") {
+    const { changes } = readCorrections(inv);
+    const account = changes.find((change) => change.field === "gl_account");
+    decide(inv, "corrected", { account: account ? account.new : bookingAccount(inv), changes: changes.length });
+  } else if (action === "reject") {
+    decide(inv, "rejected", null);
+  }
+});
+
+document.addEventListener("input", (event) => {
+  if (event.target.dataset.correct) updateCorrectForm(findInvoice(route().id));
+});
+document.addEventListener("change", (event) => {
+  if (event.target.id === "upload" && event.target.files.length) startUpload(event.target.files[0]);
+  if (event.target.id === "iban-confirmed") {
+    state.confirmed = event.target.checked;
+    document.getElementById("approve-btn").disabled = !state.confirmed;
+  }
+});
+window.addEventListener("hashchange", () => {
+  Object.assign(state, { field: null, panel: null, cite: null, confirmed: false, tab: "fields" });
+  render();
+  window.scrollTo(0, 0);
+});
+
+render();
+</script>
+</body>
+</html>
