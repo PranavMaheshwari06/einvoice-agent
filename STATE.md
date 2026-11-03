@@ -2,24 +2,21 @@
 
 Read this first in every session. Update it before every commit.
 
-Current phase: **A6a UI design** (session S4 next). A0 to A5 are built; R0a is live; R0b cloud
-part is done. The A5 live part (provider probe, recording, owner review) waits for the laptop.
+Current phase: **live passes on the laptop** (R0b live in progress, then A4 live, then A5 live).
+A0 to A5 are built; R0a is live. S4 (A6a UI design) is built on `pranav/a6a-ui-design`, is not
+merged, and awaits the owner's review (STOP).
 Rules: `CLAUDE.md`. Design: `docs/SPEC.md`. History: `docs/PHASE_LOG.md`.
 
 ## Next session
-Branch: `pranav/a6a-ui-design` (create it from `pranav/a5-agent`; S3 is not merged into `main`)
-Session: S4, phase A6a UI design, where: cloud, model: Opus
-First message: "Start S4 from STATE.md: design A6a (UI brief, user flows, clickable prototype, German/English string list), then stop for the owner's review."
-Brief:
-- Read first: SPEC 3.12 (screens), 8 (A6a row and its STOP), and `docs/notes/agent.md` for what a review shows (proposal, action, citations, vendor email, guardrail reasons).
-- Produce: a short UI brief, the user flows (inbox, invoice view with evidence next to the fields, check results, review queue with Approve / Correct / Reject), a clickable prototype with fixed sample data (no API), and one German/English string list.
-- The stack is open: the SPEC names FastAPI + Jinja2 + HTMX as the candidate. Recommend one with a reason; adding a dependency needs a decision-log line.
-- STOP when the prototype exists: the owner approves or edits it and may supply a template. Do not start A6b.
-Do not touch: Dockerfile, Compose, devcontainer, k8s, Terraform, CI files; A5 agent code except to fix a bug the prototype exposes; A6b API and persistence.
+Laptop (dev container), in this order. Each branch starts from the updated `main` after the
+previous pull request is merged.
 
-Also open on the laptop (L1):
-- R0b live on `pranav/r0b-live`: "Start L1 from STATE.md: close the R0b UNVERIFIED lines (Postgres migrations and loading, KoSIT over data/synth, real daemon report fixture), then stop."
-- A5 live on `pranav/a5-live`, started from `pranav/a5-agent`, after R0b and A4 live: "Start A5 live from STATE.md: run the provider probe, index the rules, record extraction and agent fixtures, write reports/agent_eval.json, then stop for the owner's review." Steps: `make fetch`; `einvoice db migrate`, `einvoice db index`; set `MIN_SIMILARITY` from a few relevant and unrelated queries; probe = `einvoice agent-eval` with each candidate `LLM_PROVIDER` (Gemini through `OPENAI_BASE_URL` first, ask before a paid one); `einvoice agent-eval --record` and `einvoice eval --record` with the chosen model; the owner reviews the recorded fixtures and the extraction accuracy (STOP).
+1. R0b live on `pranav/r0b-live` (in progress). Three UNVERIFIED lines wait for the owner's decision: §33 UStDV, PDF/A, SKR03. First message: "Start L1 from STATE.md: close the R0b UNVERIFIED lines (Postgres migrations and loading, KoSIT over data/synth, real daemon report fixture), then stop."
+2. A4 live on `pranav/a4-live`, started from `main` after R0b live is merged. First message: "Start A4 live from STATE.md: add the mlflow service to deploy/compose.yaml, close every [open: A4] UNVERIFIED line with /verify, check for leakage before any number is written down, then stop for the owner's calibration decision." Steps: add the `mlflow` service to `deploy/compose.yaml` (SPEC 7 and 8: profile `ml`, port bound to 127.0.0.1, a decision-log line); `einvoice seed`; `einvoice train` with the real e5 model, which also checks the "query: " prefix in `ml/coding.py`; `load_champion` from the Compose MLflow service; `einvoice eval` with the live validator; `einvoice convert` through KoSIT. Plausibility first: if a number looks too good, look for leakage (seller split, thresholds chosen on validation only, worst errors) before writing it down. Commit and push, open no PR yet. STOP for the calibration decision: show `ece` and `ece_uncalibrated` for both models from `reports/gl_coder.json`, from `reports/metrics.json` the test result at the operating point (coverage, wrong, risk_upper_95) and the worst errors, explain the "A4 findings" block, and recommend either isotonic as specified or top-label isotonic on out-of-fold scores. Do not tick A4 live before the decision. After it: apply it (retrain if needed), update `reports/`, this file and `docs/PHASE_LOG.md`, open the PR "A4 live".
+3. A5 live on `pranav/a5-live`, started from `main` after A4 live is merged. First message: "Start A5 live from STATE.md: run the provider probe, index the rules, record extraction and agent fixtures, write reports/agent_eval.json, then stop for the owner's review." Steps: `make fetch`; `einvoice db migrate`, `einvoice db index`; set `MIN_SIMILARITY` from a few relevant and unrelated queries; probe = `einvoice agent-eval` with each candidate `LLM_PROVIDER` (Gemini through `OPENAI_BASE_URL` first, ask before a paid one); `einvoice agent-eval --record` and `einvoice eval --record` with the chosen model; the owner reviews the recorded fixtures and the extraction accuracy (STOP).
+
+Waiting for the owner (no session to start): S4 (A6a UI design) is built on `pranav/a6a-ui-design` (2 commits on top of `pranav/a5-agent`; not merged into `main`). The owner reviews `docs/ui/brief.md` and `docs/ui/prototype/index.html` and answers the open points in the brief (STOP). S5 (A6b build, A7 build) starts only after that; its brief is in the STATE.md of `pranav/a6a-ui-design`.
+Do not touch: A6b code (API, persistence, UI); the files under `docs/ui/` (they live on `pranav/a6a-ui-design`).
 
 ## Sessions
 One session per row. The branch of a session starts from the tip of the previous one unless
@@ -30,7 +27,7 @@ that one is already merged into `main`.
 | S1 (done) | instruction files, R0b cloud fixes | cloud, Sonnet | `pranav/claude-code-setup` |
 | S2 | A4 build | cloud, Opus | `pranav/a4-models-eval` |
 | S3 (done) | A5 build | cloud, Opus | `pranav/a5-agent` |
-| S4 | A6a UI design | cloud, Opus | `pranav/a6a-ui-design` |
+| S4 (built, awaiting owner review, not merged) | A6a UI design | cloud, Opus | `pranav/a6a-ui-design` |
 | S5 | A6b build, A7 build | cloud, Sonnet | `pranav/a6b-api-ui` |
 | L1 | R0a, then live passes R0b, A4, A5, A6b, A7 | laptop dev container, Sonnet then Opus | `pranav/r0-dev-environment`, then `pranav/<phase>-live` |
 | L2 | A8, A9 | laptop, Opus then Sonnet | `pranav/a8-infra`, `pranav/a9-release` |
@@ -50,7 +47,7 @@ VS Code on the laptop.
 - [ ] R0b Catch-up: [x] build (cloud, S1), [ ] live (laptop)
 - [ ] A4 Models + eval: [x] build (S2), [ ] live
 - [ ] A5 Agent: [x] build (S3), [ ] live (provider probe, recording; STOP)
-- [ ] A6a UI design: [ ] prototype (S4; STOP)
+- [ ] A6a UI design: [x] prototype built (S4, on `pranav/a6a-ui-design`, not merged), [ ] owner approval (STOP)
 - [ ] A6b API + UI: [ ] build (S5), [ ] live (STOP)
 - [ ] A7 Monitoring: [ ] build (S5), [ ] live
 - [ ] A8 Infra: build, live (laptop)
