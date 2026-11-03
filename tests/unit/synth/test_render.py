@@ -6,8 +6,7 @@ import pytest
 
 from einvoice.parsing.cii import parse_cii
 from einvoice.parsing.detect import detect_format
-from einvoice.parsing.ubl import NS as UBL_NS
-from einvoice.parsing.ubl import parse_ubl
+from einvoice.parsing.ubl import NS, parse_ubl
 from einvoice.parsing.xmltools import parse_xml
 from einvoice.synth import render
 from einvoice.synth.generate import generate
@@ -58,5 +57,5 @@ def test_ubl_output_parses_back(generated_invoice):
 
 def test_ubl_currency_sits_on_the_amount_only(generated_invoice):
     root = parse_xml(render.invoice_to_ubl(generated_invoice))
-    assert root.xpath("//cac:Price/@*", namespaces=UBL_NS) == []
-    assert root.xpath("//cac:Price/cbc:PriceAmount/@currencyID", namespaces=UBL_NS)
+    assert root.xpath("//cac:Price/@*", namespaces=NS) == []
+    assert root.xpath("//cac:Price/cbc:PriceAmount/@currencyID", namespaces=NS)

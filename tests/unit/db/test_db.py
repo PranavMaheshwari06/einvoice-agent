@@ -141,14 +141,13 @@ def test_vendor_history_lists_booked_accounts():
 def live_connection():
     """A connection whose tables live in a throwaway schema, so the dev data stays untouched."""
     schema = f"test_{uuid.uuid4().hex}"
-    with psycopg.connect(get_settings().database_url) as connection:
+    with db.connect(get_settings().database_url) as connection:
         connection.execute(f"CREATE SCHEMA {schema}")
         connection.execute(f"SET search_path TO {schema}, public")
         connection.commit()
         yield connection
         connection.rollback()
         connection.execute(f"DROP SCHEMA {schema} CASCADE")
-        connection.commit()
 
 
 def write_master_data(directory):

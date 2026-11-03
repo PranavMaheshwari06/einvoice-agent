@@ -47,10 +47,11 @@ def test_line_without_quantity_fails(mustang_invoice):
     assert failed(check_mandatory_fields(invoice, RuleContext())) == {"MISSING_LINE_DETAILS"}
 
 
-def test_small_amount_invoice_needs_fewer_fields(mustang_invoice):
-    invoice = mustang_invoice.model_copy(
+def stripped_invoice(invoice, gross_total):
+    """The invoice without the fields only a non-small invoice needs (§33 UStDV), at this total."""
+    return invoice.model_copy(
         update={
-            "gross_total": xml_value(Decimal("119.00")),
+            "gross_total": xml_value(gross_total),
             "buyer_name": None,
             "buyer_address": None,
             "number": None,
@@ -58,6 +59,10 @@ def test_small_amount_invoice_needs_fewer_fields(mustang_invoice):
             "delivery_date": None,
         }
     )
+
+
+def test_small_amount_invoice_needs_fewer_fields(mustang_invoice):
+    invoice = stripped_invoice(mustang_invoice, Decimal("119.00"))
     results = check_mandatory_fields(invoice, RuleContext())
     assert failed(results) == set()
     assert "MISSING_SELLER_NAME" in {result.code for result in results}
@@ -85,16 +90,7 @@ def test_small_amount_relief_ends_just_above_250_euro(
     mustang_invoice, gross_total, expected_failures
 ):
     """§33 UStDV: a total that 'nicht übersteigt' 250 EUR qualifies, one cent more does not."""
-    invoice = mustang_invoice.model_copy(
-        update={
-            "gross_total": xml_value(gross_total),
-            "buyer_name": None,
-            "buyer_address": None,
-            "number": None,
-            "seller_vat_id": None,
-            "delivery_date": None,
-        }
-    )
+    invoice = stripped_invoice(mustang_invoice, gross_total)
     assert failed(check_mandatory_fields(invoice, RuleContext())) == expected_failures
 
 

@@ -10,6 +10,7 @@ from einvoice.parsing.cii import parse_cii
 from einvoice.parsing.detect import detect_format
 from einvoice.parsing.ubl import parse_ubl
 from einvoice.parsing.zugferd import embedded_invoice_xml, parse_zugferd
+from einvoice.pipeline import read_structured
 from einvoice.rules import engine
 from einvoice.synth.generate import (
     PROBLEMS,
@@ -92,10 +93,8 @@ def test_kosit_rejects_exactly_the_files_with_a_validator_visible_problem(gold_d
     for record in gold:
         if record["format"] not in PARSERS:
             continue
-        content = (gold_dir / record["file"]).read_bytes()
-        if record["format"] == "zugferd_pdf":
-            content = embedded_invoice_xml(PdfReader(BytesIO(content)))
-        result = validate(content, get_settings().validator_url)
+        _, xml = read_structured((gold_dir / record["file"]).read_bytes(), record["format"])
+        result = validate(xml, get_settings().validator_url)
         assert result.accepted == (record["problem"] not in kosit_visible), (
             record["id"],
             [error.rule_id for error in result.errors],
