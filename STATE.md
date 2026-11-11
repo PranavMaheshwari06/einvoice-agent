@@ -2,8 +2,8 @@
 
 Read this first in every session. Update it before every commit.
 
-Current phase: **A4 live, stopped for the owner's calibration decision** (STOP), then A5 live.
-A0 to A5 are built; R0a and R0b are live and merged. S4 (A6a UI design) is built on
+Current phase: **A4 live done** on `pranav/a4-live` (PR "A4 live" to merge), then the SPEC
+hardening PR, then A5 live. A0 to A5 are built; R0a, R0b and A4 are live. S4 (A6a UI design) is built on
 `pranav/a6a-ui-design`, is not merged, and awaits the owner's review (STOP).
 Rules: `CLAUDE.md`. Design: `docs/SPEC.md`. History: `docs/PHASE_LOG.md`.
 
@@ -12,8 +12,9 @@ Laptop (dev container), in this order. Each branch starts from the updated `main
 previous pull request is merged.
 
 1. R0b live: merged (PR #4).
-2. A4 live on `pranav/a4-live`: the mlflow service, train with real e5, eval with live KoSIT and convert through KoSIT are done (see "A4 live findings"). Waiting for the owner's calibration decision (STOP); after it, apply it, retrain, re-run `einvoice eval`, commit `reports/`, update this file and `docs/PHASE_LOG.md`, open the PR "A4 live". Original brief: First message: "Start A4 live from STATE.md: add the mlflow service to deploy/compose.yaml, close every [open: A4] UNVERIFIED line with /verify, check for leakage before any number is written down, then stop for the owner's calibration decision." Steps: add the `mlflow` service to `deploy/compose.yaml` (SPEC 7 and 8: profile `ml`, port bound to 127.0.0.1, a decision-log line); `einvoice seed`; `einvoice train` with the real e5 model, which also checks the "query: " prefix in `ml/coding.py`; `load_champion` from the Compose MLflow service; `einvoice eval` with the live validator; `einvoice convert` through KoSIT. Plausibility first: if a number looks too good, look for leakage (seller split, thresholds chosen on validation only, worst errors) before writing it down. Commit and push, open no PR yet. STOP for the calibration decision: show `ece` and `ece_uncalibrated` for both models from `reports/gl_coder.json`, from `reports/metrics.json` the test result at the operating point (coverage, wrong, risk_upper_95) and the worst errors, explain the "A4 findings" block, and recommend either isotonic as specified or top-label isotonic on out-of-fold scores. Do not tick A4 live before the decision. After it: apply it (retrain if needed), update `reports/`, this file and `docs/PHASE_LOG.md`, open the PR "A4 live".
-3. A5 live on `pranav/a5-live`, started from `main` after A4 live is merged. First message: "Start A5 live from STATE.md: run the provider probe, index the rules, record extraction and agent fixtures, write reports/agent_eval.json, then stop for the owner's review." Steps: `make fetch`; `einvoice db migrate`, `einvoice db index`; set `MIN_SIMILARITY` from a few relevant and unrelated queries; probe = `einvoice agent-eval` with each candidate `LLM_PROVIDER` (Gemini through `OPENAI_BASE_URL` first, ask before a paid one); `einvoice agent-eval --record` and `einvoice eval --record` with the chosen model; the owner reviews the recorded fixtures and the extraction accuracy (STOP).
+2. A4 live on `pranav/a4-live`: done (see "A4 live findings"). The owner merges the PR "A4 live".
+2b. SPEC hardening on `pranav/spec-hardening`, docs only, from `main` after A4 live is merged. The owner chose real-use hardening on 2026-11-12 (login with roles, audit trail, CSRF and CSP, uploads in Postgres, least-privilege DB roles, secrets, encryption and backups on Azure, a retention period from §147 AO checked against the primary source, LLM data flow, prompt-injection test). Add SPEC 3.14 "Security", put each item into its phase (A6b, A8, A9), add a decision-log line on the larger scope, and open the PR. No code.
+3. A5 live on `pranav/a5-live`, started from `main` after A4 live is merged. First message: "Start A5 live from STATE.md: run the provider probe, index the rules, record extraction and agent fixtures, write reports/agent_eval.json, then stop for the owner's review." The owner puts the Gemini key into `.env` (`LLM_PROVIDER=openai`, `OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/`, `OPENAI_API_KEY`); free tier only for synthetic data. After recording, re-run `einvoice eval` so PDFs and scans count in `reports/metrics.json`. Steps: `make fetch`; `einvoice db migrate`, `einvoice db index`; set `MIN_SIMILARITY` from a few relevant and unrelated queries; probe = `einvoice agent-eval` with each candidate `LLM_PROVIDER` (Gemini through `OPENAI_BASE_URL` first, ask before a paid one); `einvoice agent-eval --record` and `einvoice eval --record` with the chosen model; the owner reviews the recorded fixtures and the extraction accuracy (STOP).
 
 Waiting for the owner (no session to start): S4 (A6a UI design) is built on `pranav/a6a-ui-design` (2 commits on top of `pranav/a5-agent`; not merged into `main`). The owner reviews `docs/ui/brief.md` and `docs/ui/prototype/index.html` and answers the open points in the brief (STOP). S5 (A6b build, A7 build) starts only after that; its brief is in the STATE.md of `pranav/a6a-ui-design`.
 Do not touch: A6b code (API, persistence, UI); the files under `docs/ui/` (they live on `pranav/a6a-ui-design`).
@@ -45,7 +46,7 @@ VS Code on the laptop.
 - [x] A3 Extraction (text, OCR, LLM extraction, evidence check): build; [ ] live (R0b, A5)
 - [x] R0a Environment (dev container, Dockerfile, Compose, lockfile): [x] build, [x] live (L1)
 - [x] R0b Catch-up: [x] build (cloud, S1), [x] live (L1; the PDF/A line moved to A9)
-- [ ] A4 Models + eval: [x] build (S2), [ ] live (checks run; calibration decision pending, STOP)
+- [x] A4 Models + eval: [x] build (S2), [x] live (L1; raw scores, no calibration, owner decision)
 - [ ] A5 Agent: [x] build (S3), [ ] live (provider probe, recording; STOP)
 - [ ] A6a UI design: [x] prototype built (S4, on `pranav/a6a-ui-design`, not merged), [ ] owner approval (STOP)
 - [ ] A6b API + UI: [ ] build (S5), [ ] live (STOP)
@@ -131,11 +132,12 @@ One line each: date, decision, reason.
 - 2026-11-03: `SMALL_AMOUNT_LIMIT` = 250 EUR confirmed by the owner against §33 UStDV (gesetze-im-internet.de). `test_ustg14.py` pins 250.00 (relief applies) and 250.01 (it does not). The §33 exclusion for services under §§ 3c, 6a and 13b UStG is not implemented, on the owner's decision (open item in UNVERIFIED).
 - 2026-11-03: The ZUGFeRD PDFs of the generator are not valid PDF/A-3 (Mustang 2.26.0 with veraPDF). The owner accepted this as a limitation: generate.py is unchanged, the README Limitations names it, and the UNVERIFIED line is tagged `[open: A9]`. R0b live and A2 live are ticked on that basis.
 - 2026-11-12: A4 live: `mlflow` service in Compose profile `ml`, built from the project Dockerfile (mlflow 3.17.2 from the lock, no second image), SQLite backend and artifacts on the volume `mlflow-data` at `/home/dev/mlflow` (created in the Dockerfile, since a volume over a missing path is root-owned), port bound to 127.0.0.1. `--allowed-hosts mlflow:5000,localhost:5000,127.0.0.1:5000` because MLflow 3.17 compares the Host header exactly, port included, and only allows localhost and private IPs by default. `make up` starts `core` and `ml`; the dev service gets `MLFLOW_TRACKING_URI=http://mlflow:5000`. Reason: SPEC 7 adds mlflow in A4; every later phase needs the champion.
+- 2026-11-12: No calibration step for the GL model (owner decision at the A4 STOP; SPEC 3.6 changed, `ml/coding.py::calibrate` and `E5Encoder.__deepcopy__` removed; the latter only let the calibration folds share one encoder). The gate uses the logistic regression's top probability with the threshold chosen on validation. Reason: isotonic as specified cut coverage at 98 % precision about tenfold and its plateaus kept 4 wrong bookings above GL 0.60 to 0.85; top-label isotonic on out-of-fold scores calibrated best but had four score levels and lower coverage; the threshold is picked empirically, so ranking decides. ECE stays in the report; the UI should call the number a model score.
 - 2026-11-12: Closed live: the real e5 model loads with the `query: ` prefix and both models log to the Compose MLflow; `einvoice eval` loaded `gl-coder@champion` from it; `einvoice convert` output is accepted by KoSIT (`test_live_validator_accepts_a_ubl_invoice_written_as_cii`). `load_champion` from the Compose server gets no integration test: a test would have to register a model there and would move the shared `champion` alias; `test_train.py` covers the round trip on a temporary SQLite store.
 
 ## A4 live findings (L1, 2026-11-12, seed 1, real e5, Compose MLflow, live KoSIT)
-Numbers from `reports/gl_coder.json` and `reports/metrics.json` of this run (isotonic as specified;
-not committed until the calibration decision is applied).
+The first run used isotonic calibration as specified; its reports were replaced by the run with
+raw scores after the owner's decision. The committed `reports/` are from that second run.
 - Leakage checks: no seller is in two splits (`split_lines` raises otherwise; 53 / 17 / 19
   sellers incl. one-off unknown vendors); thresholds are chosen on validation, reported on test.
 - Rules: at GL threshold 0 the test split books exactly its 284 clean structured invoices and
@@ -149,7 +151,17 @@ not committed until the calibration decision is applied).
   0.207; top-label isotonic on seller-grouped out-of-fold scores 0.303 / 0.238, ECE 0.041 /
   0.097 (4 distinct scores). e5 raw 0.467 / 0.334, ECE 0.307 / 0.380; isotonic 0.108 / 0.172;
   top-label 0.0 / 0.0 (11 distinct scores).
-- Champion on validation macro-F1: TF-IDF (0.808 vs e5 0.755).
+- Champion on validation macro-F1: TF-IDF (isotonic run 0.808 vs e5 0.755; raw run 0.782 vs
+  0.772).
+- Pipeline with raw scores (committed `reports/metrics.json`): operating point extraction 0.99 /
+  GL 0.90 (validation: 63 booked, coverage 0.326, 0 wrong); on test 66 of 334 processed
+  invoices booked (coverage 0.198), 0 wrong, rule-of-three bound 0.045. Test is below
+  validation, the direction expected from unseen sellers. Only structured invoices count so far:
+  104 validation and 150 test PDFs and scans are skipped until A5 records extraction replies.
+- Worst errors (no wrong booking at the operating point, so the most confident wrong test
+  lines of the champion): 0.86 hotel night 4650 for 4660, 0.82 caretaker hour 4800 for 4260,
+  0.82 tax advice hour 4955 for 4950, then 0.67 and below. These are neighbouring accounts that
+  the generator maps per vendor (`alt_account`), not a pipeline defect.
 
 ## A4 findings, superseded by the live findings above (S2, cloud run on seed 1, 2000 invoices, hashing stub instead of e5, KoSIT skipped)
 Numbers are not quoted here because they come from a stubbed run outside `reports/`; rerun
