@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 from io import BytesIO
 
 import pytest
@@ -33,6 +34,14 @@ def test_pdf_and_standalone_xml_of_the_same_invoice_agree():
     assert from_pdf.model_dump(exclude=header) == from_xml.model_dump(exclude=header)
     line_nets = [[line.net_amount for line in invoice.lines] for invoice in (from_pdf, from_xml)]
     assert line_nets[0] == line_nets[1]
+
+
+def test_reads_xrechnung_xml_attached_to_a_pdf():
+    invoice = parse_zugferd((FIXTURES / "corpus" / "XRECHNUNG_Einfach.pdf").read_bytes())
+    assert invoice.format == "zugferd_pdf"
+    assert invoice.number.value == "471102"
+    assert invoice.gross_total.value == Decimal("529.87")
+    assert len(invoice.lines) == 2
 
 
 def test_plain_pdf_is_rejected():

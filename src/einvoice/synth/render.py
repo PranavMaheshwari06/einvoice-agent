@@ -12,6 +12,13 @@ from PIL import Image
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
+from einvoice.convert import (
+    CONTACT_EMAIL,
+    CONTACT_NAME,
+    CONTACT_PHONE,
+    PEPPOL_BILLING_PROCESS,
+    XRECHNUNG_ID,
+)
 from einvoice.models import Invoice
 
 UBL_NS = {
@@ -19,8 +26,6 @@ UBL_NS = {
     "cac": "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2",
     "cbc": "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2",
 }
-XRECHNUNG_ID = "urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0"
-CONTACT_EMAIL = "rechnung@example.com"
 UNIT_TEXT = {
     "C62": "Stk",
     "HUR": "Std",
@@ -41,7 +46,8 @@ def _sub(parent: etree._Element, path: str, text: str | None = None, **attribute
     element = parent
     for step in path.split("/"):
         prefix, name = step.split(":")
-        element = etree.SubElement(element, f"{{{UBL_NS[prefix]}}}{name}", **attributes)
+        element = etree.SubElement(element, f"{{{UBL_NS[prefix]}}}{name}")
+    element.attrib.update(attributes)
     if text is not None:
         element.text = text
     return element
@@ -62,8 +68,8 @@ def _party(parent: etree._Element, role: str, name, address, vat_id, with_contac
     _sub(party, "cac:PartyLegalEntity/cbc:RegistrationName", name.value)
     if with_contact:
         contact = _sub(party, "cac:Contact")
-        _sub(contact, "cbc:Name", "Rechnungswesen")
-        _sub(contact, "cbc:Telephone", "+49 30 1234567")
+        _sub(contact, "cbc:Name", CONTACT_NAME)
+        _sub(contact, "cbc:Telephone", CONTACT_PHONE)
         _sub(contact, "cbc:ElectronicMail", CONTACT_EMAIL)
 
 
@@ -79,7 +85,7 @@ def invoice_to_ubl(invoice: Invoice) -> bytes:
     currency = {"currencyID": invoice.currency.value}
     root = etree.Element(f"{{{UBL_NS[None]}}}Invoice", nsmap=UBL_NS)
     _sub(root, "cbc:CustomizationID", XRECHNUNG_ID)
-    _sub(root, "cbc:ProfileID", "urn:fdc:peppol.eu:2017:poacc:billing:01:1.0")
+    _sub(root, "cbc:ProfileID", PEPPOL_BILLING_PROCESS)
     _sub(root, "cbc:ID", invoice.number.value)
     _sub(root, "cbc:IssueDate", invoice.issue_date.value.isoformat())
     if invoice.due_date is not None:

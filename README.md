@@ -56,3 +56,14 @@ On Windows, clone inside the WSL filesystem (`~/`), not under `/mnt/c`.
 
 An API key, if you use one, goes in `.env` (git-ignored), never in a committed file.
 `.env.example` lists the variable names.
+
+## Limitations
+
+- The ZUGFeRD PDFs that `einvoice seed` writes are not valid PDF/A-3. I ran two of them through
+  Mustang 2.26.0, which includes veraPDF, and both fail the same two rules: the Helvetica fonts
+  are not embedded, and DeviceGray is used without an output intent. The XML inside the one
+  without an injected error passed Mustang's XML check, and my parsers and rules read these
+  files. A strict PDF/A check would still reject them.
+- The mandatory-field rule gives every invoice with a gross total up to 250 EUR the small-invoice
+  relief of §33 UStDV, but §33 excludes invoices for services under §§ 3c, 6a and 13b UStG, which
+  the rule does not check, so it can accept such an invoice with fields missing that §14 UStG requires.

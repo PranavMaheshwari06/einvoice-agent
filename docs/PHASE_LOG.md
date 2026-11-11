@@ -83,3 +83,28 @@ the replay results only show that the pipeline works; six `[cloud-built]` lines 
 `KeyError` in a tool no longer looks like a lookup miss), the round cap and citation recall over
 citing cases only. Result: ruff clean, 334 passed, 2 skipped (OCR). Next: S4, A6a UI design,
 Opus; A5 live on the laptop.
+
+## L1, R0b live (2026-11-03)
+
+Closed the R0b lines in the dev container against the live Postgres, KoSIT validator and
+tesseract. Verified live: the daemon answers 406 for a UBL without BuyerReference, and its real
+report replaces the hand-written fixture; a public XRechnung PDF (`XRECHNUNG_Einfach.pdf`)
+carries the `xrechnung.xml` attachment that `parse_zugferd` reads; `db migrate` and `db load`
+run twice without change, and the unique and check constraints reject a duplicate invoice and
+an unknown decision; the validator accepts every structured file of the generated sample (200
+invoices) except those with a problem it can see (`vat_sum_off`, `missing_vat_id`); OCR reads
+number and seller on all 13 scans of that sample, but not every amount (a digit was misread on
+inv_00187 of seed 1). Found and fixed: the UBL writer put `currencyID` on every element of a
+multi-step path, and the CII writer lacked BT-23. Three SKR03 numbers were wrong against DATEV's
+Standardkontenrahmen SKR 03 (Art.-Nr. 11174, valid 2026): 0650, 0670 and 4610 became 0420, 0480
+and 4600. `data/synth` was regenerated; the gold is identical after the rename and the training
+report is byte-identical (hashing stub, so an invariance check and not a measurement). The owner
+confirmed the §33 UStDV limit of 250 EUR; the 250.00 and 250.01 boundary is pinned, and the
+exclusion for §§ 3c, 6a and 13b UStG is not implemented and sits in the README Limitations. The
+generated ZUGFeRD PDFs fail PDF/A-3 (Mustang 2.26.0 with veraPDF, run in a container without
+network; the control passes); the owner accepted this as a limitation, the README Limitations
+names it, `generate.py` is unchanged and the open line moved to A9. `main` (A5) was merged
+into the branch. `/simplify` made `render.py` take its KoSIT constants from `convert.py` and
+let two tests reuse `read_structured` and `db.connect`. `/code-review` raised nine points; one
+(this entry) was applied, the others were owner decisions or theoretical. Result: ruff clean,
+344 passed, 6 integration passed. Next: A4 live on `pranav/a4-live`, started from `main`.

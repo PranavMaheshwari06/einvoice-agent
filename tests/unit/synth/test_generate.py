@@ -4,11 +4,13 @@ from io import BytesIO
 import pytest
 from pypdf import PdfReader
 
+from einvoice.config import get_settings
 from einvoice.models import PriorInvoice, RuleContext, ValidationResult
 from einvoice.parsing.cii import parse_cii
 from einvoice.parsing.detect import detect_format
 from einvoice.parsing.ubl import parse_ubl
 from einvoice.parsing.zugferd import embedded_invoice_xml, parse_zugferd
+from einvoice.pipeline import read_structured
 from einvoice.rules import engine
 from einvoice.synth.generate import (
     PROBLEMS,
@@ -17,6 +19,7 @@ from einvoice.synth.generate import (
     read_gold,
     read_master_data,
 )
+from einvoice.validation.kosit import validate
 
 PARSERS = {"cii": parse_cii, "ubl": parse_ubl, "zugferd_pdf": parse_zugferd}
 
@@ -79,6 +82,25 @@ def test_rules_flag_exactly_the_labelled_problems(gold_dir, gold):
         # Every earlier invoice counts as received, whatever its format.
         prior.append(prior_invoice(record))
     assert checked > 50
+
+
+@pytest.mark.integration
+def test_kosit_rejects_exactly_the_files_with_a_validator_visible_problem(gold_dir, gold):
+    # The other injected problems (wrong VAT rate, changed IBAN, ...) are business facts the
+    # standard cannot see, so KoSIT must accept those files.
+    kosit_visible = {"vat_sum_off", "missing_vat_id"}
+    validated = 0
+    for record in gold:
+        if record["format"] not in PARSERS:
+            continue
+        _, xml = read_structured((gold_dir / record["file"]).read_bytes(), record["format"])
+        result = validate(xml, get_settings().validator_url)
+        assert result.accepted == (record["problem"] not in kosit_visible), (
+            record["id"],
+            [error.rule_id for error in result.errors],
+        )
+        validated += 1
+    assert validated > 50
 
 
 def test_gold_amounts_add_up(gold):

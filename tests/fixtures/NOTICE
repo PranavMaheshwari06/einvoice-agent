@@ -8,6 +8,7 @@ corpus/*
   Source: ZUGFeRD corpus, commit 82e886fb2136, https://github.com/ZUGFeRD/corpus
   Files: XML-Rechnung/CII/EN16931_Einfach.cii.xml, XML-Rechnung/CII/EN16931_Rabatte.cii.xml,
          XML-Rechnung/UBL/EN16931_Einfach.ubl.xml, XML-Rechnung/UBL/ubl-tc434-creditnote1.xml,
+         XML-Rechnung/FX/XRECHNUNG_Einfach.pdf,
          ZUGFeRDv2/correct/intarsys/EN16931/zugferd_2p0_EN16931_Einfach.pdf,
          ZUGFeRDv2/correct/Mustangproject/MustangGnuaccountingBeispielRE-20201121_508.pdf
   Licence: Apache License 2.0, copyright the respective contributors of the corpus

@@ -22,7 +22,7 @@ TEXTS = [
     for seller in ("Alpha GmbH", "Beta AG", "Gamma KG", "Delta OHG", "Epsilon eG", "Zeta UG")
     for item in ("Druckerpapier A4", "Toner schwarz", "Bürostuhl", "Webhosting")
 ]
-ACCOUNTS = ["4930", "4930", "0650", "4980"] * 6
+ACCOUNTS = ["4930", "4930", "0420", "4980"] * 6
 SELLERS = [text.split(" | ")[1] for text in TEXTS]
 
 
@@ -69,7 +69,7 @@ def test_suggestion_uses_the_largest_line():
         ],
     )
     account, probability = suggest_account(calibrated, invoice)
-    assert account == "0650"
+    assert account == "0420"
     assert 0 <= probability <= 1
 
 
