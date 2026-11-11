@@ -50,7 +50,6 @@ def test_both_models_are_scored_against_each_other(trained):
     assert report["encoder"] == "stub-hashing"
     for scores in validation.values():
         assert 0 <= scores["ece"] <= 1
-        assert 0 <= scores["ece_uncalibrated"] <= 1
         assert 0 <= scores["coverage_at_98_precision"] <= 1
 
 

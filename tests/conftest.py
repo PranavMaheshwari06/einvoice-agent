@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 from sklearn.feature_extraction.text import HashingVectorizer
 
-from einvoice.ml.coding import calibrate, tfidf_model
+from einvoice.ml.coding import tfidf_model
 from einvoice.ml.train import split_lines
 from einvoice.models import (
     Evidence,
@@ -142,6 +142,6 @@ def gold_dir(tmp_path_factory) -> Path:
 
 @pytest.fixture(scope="session")
 def gl_model(gold_dir):
-    """A calibrated TF-IDF model trained on the train split of the small gold set."""
+    """A TF-IDF model trained on the train split of the small gold set."""
     train = split_lines(read_gold(gold_dir))["train"]
-    return calibrate(tfidf_model(), train.texts, train.accounts, train.sellers)
+    return tfidf_model().fit(train.texts, train.accounts)

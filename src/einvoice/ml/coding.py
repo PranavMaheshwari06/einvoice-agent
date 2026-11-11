@@ -1,13 +1,11 @@
-"""GL-account models (SKR03 per invoice line), their calibration and the scores that judge them."""
+"""GL-account models (SKR03 per invoice line) and the scores that judge them."""
 
 from collections.abc import Callable, Sequence
 
 import numpy as np
 from sklearn.base import ClassifierMixin
-from sklearn.calibration import CalibratedClassifierCV
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import GroupKFold
 from sklearn.pipeline import FeatureUnion, Pipeline, make_pipeline
 from sklearn.preprocessing import FunctionTransformer
 
@@ -15,7 +13,6 @@ from einvoice.models import Invoice
 
 Encoder = Callable[[list[str]], np.ndarray]
 E5_MODEL = "intfloat/multilingual-e5-small"
-CALIBRATION_FOLDS = 5
 ECE_BINS = 10
 
 
@@ -26,8 +23,8 @@ def line_text(item_name: str, seller_name: str) -> str:
 class E5Encoder:
     """Loads the sentence-transformers model on first use; the model and cache stay out of pickles.
 
-    The calibrated model holds one fitted copy per fold and each encodes the same text, so
-    vectors are cached by text.
+    Training, scoring and every invoice repeat the same item and seller, so vectors are
+    cached by text.
     """
 
     def __init__(self, prefix: str = "query: ") -> None:
@@ -51,10 +48,6 @@ class E5Encoder:
     def __getstate__(self) -> dict:
         return {"_prefix": self._prefix, "_model": None, "_cache": {}}
 
-    def __deepcopy__(self, _memo: dict) -> "E5Encoder":
-        # sklearn's clone deep-copies kw_args; the encoder is not fitted, so folds share it.
-        return self
-
 
 def _encode_unique(texts: Sequence[str], encode: Encoder) -> np.ndarray:
     """Training lines repeat the same seller and item many times; encode each text once."""
@@ -75,15 +68,6 @@ def tfidf_model() -> Pipeline:
 def embedding_model(encode: Encoder) -> Pipeline:
     encoder = FunctionTransformer(_encode_unique, kw_args={"encode": encode})
     return make_pipeline(encoder, LogisticRegression(max_iter=2000))
-
-
-def calibrate(
-    model: Pipeline, texts: list[str], accounts: list[str], sellers: list[str]
-) -> CalibratedClassifierCV:
-    """Isotonic calibration on seller-grouped folds, so each fold calibrates on unseen sellers."""
-    folds = list(GroupKFold(CALIBRATION_FOLDS).split(texts, accounts, sellers))
-    calibrated = CalibratedClassifierCV(model, method="isotonic", cv=folds)
-    return calibrated.fit(texts, accounts)
 
 
 def expected_calibration_error(confidence: np.ndarray, correct: np.ndarray) -> float:
