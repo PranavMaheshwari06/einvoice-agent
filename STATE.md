@@ -2,17 +2,17 @@
 
 Read this first in every session. Update it before every commit.
 
-Current phase: **live passes on the laptop** (R0b live waits for the owner's merge, then A4 live, then A5 live).
-A0 to A5 are built; R0a is live. S4 (A6a UI design) is built on `pranav/a6a-ui-design`, is not
-merged, and awaits the owner's review (STOP).
+Current phase: **A4 live, stopped for the owner's calibration decision** (STOP), then A5 live.
+A0 to A5 are built; R0a and R0b are live and merged. S4 (A6a UI design) is built on
+`pranav/a6a-ui-design`, is not merged, and awaits the owner's review (STOP).
 Rules: `CLAUDE.md`. Design: `docs/SPEC.md`. History: `docs/PHASE_LOG.md`.
 
 ## Next session
 Laptop (dev container), in this order. Each branch starts from the updated `main` after the
 previous pull request is merged.
 
-1. R0b live on `pranav/r0b-live`: done; the PDF/A line is accepted as a limitation and moved to A9. The pull request "R0b live" waits for the owner's merge; nothing to start.
-2. A4 live on `pranav/a4-live`, started from `main` after R0b live is merged. First message: "Start A4 live from STATE.md: add the mlflow service to deploy/compose.yaml, close every [open: A4] UNVERIFIED line with /verify, check for leakage before any number is written down, then stop for the owner's calibration decision." Steps: add the `mlflow` service to `deploy/compose.yaml` (SPEC 7 and 8: profile `ml`, port bound to 127.0.0.1, a decision-log line); `einvoice seed`; `einvoice train` with the real e5 model, which also checks the "query: " prefix in `ml/coding.py`; `load_champion` from the Compose MLflow service; `einvoice eval` with the live validator; `einvoice convert` through KoSIT. Plausibility first: if a number looks too good, look for leakage (seller split, thresholds chosen on validation only, worst errors) before writing it down. Commit and push, open no PR yet. STOP for the calibration decision: show `ece` and `ece_uncalibrated` for both models from `reports/gl_coder.json`, from `reports/metrics.json` the test result at the operating point (coverage, wrong, risk_upper_95) and the worst errors, explain the "A4 findings" block, and recommend either isotonic as specified or top-label isotonic on out-of-fold scores. Do not tick A4 live before the decision. After it: apply it (retrain if needed), update `reports/`, this file and `docs/PHASE_LOG.md`, open the PR "A4 live".
+1. R0b live: merged (PR #4).
+2. A4 live on `pranav/a4-live`: the mlflow service, train with real e5, eval with live KoSIT and convert through KoSIT are done (see "A4 live findings"). Waiting for the owner's calibration decision (STOP); after it, apply it, retrain, re-run `einvoice eval`, commit `reports/`, update this file and `docs/PHASE_LOG.md`, open the PR "A4 live". Original brief: First message: "Start A4 live from STATE.md: add the mlflow service to deploy/compose.yaml, close every [open: A4] UNVERIFIED line with /verify, check for leakage before any number is written down, then stop for the owner's calibration decision." Steps: add the `mlflow` service to `deploy/compose.yaml` (SPEC 7 and 8: profile `ml`, port bound to 127.0.0.1, a decision-log line); `einvoice seed`; `einvoice train` with the real e5 model, which also checks the "query: " prefix in `ml/coding.py`; `load_champion` from the Compose MLflow service; `einvoice eval` with the live validator; `einvoice convert` through KoSIT. Plausibility first: if a number looks too good, look for leakage (seller split, thresholds chosen on validation only, worst errors) before writing it down. Commit and push, open no PR yet. STOP for the calibration decision: show `ece` and `ece_uncalibrated` for both models from `reports/gl_coder.json`, from `reports/metrics.json` the test result at the operating point (coverage, wrong, risk_upper_95) and the worst errors, explain the "A4 findings" block, and recommend either isotonic as specified or top-label isotonic on out-of-fold scores. Do not tick A4 live before the decision. After it: apply it (retrain if needed), update `reports/`, this file and `docs/PHASE_LOG.md`, open the PR "A4 live".
 3. A5 live on `pranav/a5-live`, started from `main` after A4 live is merged. First message: "Start A5 live from STATE.md: run the provider probe, index the rules, record extraction and agent fixtures, write reports/agent_eval.json, then stop for the owner's review." Steps: `make fetch`; `einvoice db migrate`, `einvoice db index`; set `MIN_SIMILARITY` from a few relevant and unrelated queries; probe = `einvoice agent-eval` with each candidate `LLM_PROVIDER` (Gemini through `OPENAI_BASE_URL` first, ask before a paid one); `einvoice agent-eval --record` and `einvoice eval --record` with the chosen model; the owner reviews the recorded fixtures and the extraction accuracy (STOP).
 
 Waiting for the owner (no session to start): S4 (A6a UI design) is built on `pranav/a6a-ui-design` (2 commits on top of `pranav/a5-agent`; not merged into `main`). The owner reviews `docs/ui/brief.md` and `docs/ui/prototype/index.html` and answers the open points in the brief (STOP). S5 (A6b build, A7 build) starts only after that; its brief is in the STATE.md of `pranav/a6a-ui-design`.
@@ -45,7 +45,7 @@ VS Code on the laptop.
 - [x] A3 Extraction (text, OCR, LLM extraction, evidence check): build; [ ] live (R0b, A5)
 - [x] R0a Environment (dev container, Dockerfile, Compose, lockfile): [x] build, [x] live (L1)
 - [x] R0b Catch-up: [x] build (cloud, S1), [x] live (L1; the PDF/A line moved to A9)
-- [ ] A4 Models + eval: [x] build (S2), [ ] live
+- [ ] A4 Models + eval: [x] build (S2), [ ] live (checks run; calibration decision pending, STOP)
 - [ ] A5 Agent: [x] build (S3), [ ] live (provider probe, recording; STOP)
 - [ ] A6a UI design: [x] prototype built (S4, on `pranav/a6a-ui-design`, not merged), [ ] owner approval (STOP)
 - [ ] A6b API + UI: [ ] build (S5), [ ] live (STOP)
@@ -130,8 +130,28 @@ One line each: date, decision, reason.
 - 2026-11-03: The OCR integration test requires the invoice number and the seller name on every generated scan and leaves the amounts out. Tesseract misreads a digit now and then (inv_00187 of seed 1 gives 36,64 for 35,27); the arithmetic rule and the evidence check are what catch that.
 - 2026-11-03: `SMALL_AMOUNT_LIMIT` = 250 EUR confirmed by the owner against §33 UStDV (gesetze-im-internet.de). `test_ustg14.py` pins 250.00 (relief applies) and 250.01 (it does not). The §33 exclusion for services under §§ 3c, 6a and 13b UStG is not implemented, on the owner's decision (open item in UNVERIFIED).
 - 2026-11-03: The ZUGFeRD PDFs of the generator are not valid PDF/A-3 (Mustang 2.26.0 with veraPDF). The owner accepted this as a limitation: generate.py is unchanged, the README Limitations names it, and the UNVERIFIED line is tagged `[open: A9]`. R0b live and A2 live are ticked on that basis.
+- 2026-11-12: A4 live: `mlflow` service in Compose profile `ml`, built from the project Dockerfile (mlflow 3.17.2 from the lock, no second image), SQLite backend and artifacts on the volume `mlflow-data` at `/home/dev/mlflow` (created in the Dockerfile, since a volume over a missing path is root-owned), port bound to 127.0.0.1. `--allowed-hosts mlflow:5000,localhost:5000,127.0.0.1:5000` because MLflow 3.17 compares the Host header exactly, port included, and only allows localhost and private IPs by default. `make up` starts `core` and `ml`; the dev service gets `MLFLOW_TRACKING_URI=http://mlflow:5000`. Reason: SPEC 7 adds mlflow in A4; every later phase needs the champion.
+- 2026-11-12: Closed live: the real e5 model loads with the `query: ` prefix and both models log to the Compose MLflow; `einvoice eval` loaded `gl-coder@champion` from it; `einvoice convert` output is accepted by KoSIT (`test_live_validator_accepts_a_ubl_invoice_written_as_cii`). `load_champion` from the Compose server gets no integration test: a test would have to register a model there and would move the shared `champion` alias; `test_train.py` covers the round trip on a temporary SQLite store.
 
-## A4 findings (S2, cloud run on seed 1, 2000 invoices, hashing stub instead of e5, KoSIT skipped)
+## A4 live findings (L1, 2026-11-12, seed 1, real e5, Compose MLflow, live KoSIT)
+Numbers from `reports/gl_coder.json` and `reports/metrics.json` of this run (isotonic as specified;
+not committed until the calibration decision is applied).
+- Leakage checks: no seller is in two splits (`split_lines` raises otherwise; 53 / 17 / 19
+  sellers incl. one-off unknown vendors); thresholds are chosen on validation, reported on test.
+- Rules: at GL threshold 0 the test split books exactly its 284 clean structured invoices and
+  no must-review one, so all 86 wrong bookings there are GL accounts. Rules are not the limit.
+- Pipeline with isotonic as specified: operating point extraction 0.99 / GL 0.96; on test 14 of
+  334 processed invoices booked (coverage 0.042), 0 wrong, rule-of-three bound 0.214. From GL
+  0.60 to 0.85 the same 4 wrong bookings stay above the threshold (isotonic plateaus).
+- Line-level comparison, train-only calibration (validation / test; throwaway script, not in
+  the repo), coverage at 98 % precision and ECE:
+  TF-IDF raw 0.430 / 0.376, ECE 0.072 / 0.134; isotonic as specified 0.047 / 0.065, ECE 0.173 /
+  0.207; top-label isotonic on seller-grouped out-of-fold scores 0.303 / 0.238, ECE 0.041 /
+  0.097 (4 distinct scores). e5 raw 0.467 / 0.334, ECE 0.307 / 0.380; isotonic 0.108 / 0.172;
+  top-label 0.0 / 0.0 (11 distinct scores).
+- Champion on validation macro-F1: TF-IDF (0.808 vs e5 0.755).
+
+## A4 findings, superseded by the live findings above (S2, cloud run on seed 1, 2000 invoices, hashing stub instead of e5, KoSIT skipped)
 Numbers are not quoted here because they come from a stubbed run outside `reports/`; rerun
 `einvoice train` and `einvoice eval` live to get them.
 - Isotonic calibration as prescribed (`CalibratedClassifierCV`, seller-grouped `GroupKFold(5)`) did not beat the raw TF-IDF model on validation ECE, and it cut coverage at 98 % precision to a small fraction of the raw model's on both validation and test. `ensemble=False` and sigmoid did not change that. Cause: train folds (unseen sellers) are harder than the six validation sellers, so calibrated scores come out underconfident there, and isotonic steps put many lines on one plateau. Not turned into a passing test because it does not hold; `gl_coder.json` records `ece` and `ece_uncalibrated` side by side. Owner decision for the live run: keep as specified, or try top-label isotonic on out-of-fold scores.
@@ -147,10 +167,6 @@ covers it, and deleting the line.
 - [open: owner] `rules/ustg14.py::check_mandatory_fields`: applies the §33 UStDV small-invoice relief to every invoice with a gross total up to 250 EUR. §33 says that relief does not apply to invoices for services under §§ 3c, 6a and 13b UStG, and the rule does not look at that. Left unchanged on the owner's decision; the README Limitations names the gap. Decide whether the rule should check it.
 - [open: A9] `synth/generate.py`: the ZUGFeRD PDFs (reportlab plus `drafthorse.pdf.attach_xml`) are not valid PDF/A-3. Checked 2026-11-03 with Mustang-CLI 2.26.0 (the jar's sha256 equals GitHub's digest for core-2.26.0), run in a container without network: the control `tests/fixtures/corpus/MustangGnuaccountingBeispielRE-20201121_508.pdf` is PDF/A-3u compliant; `data/synth/invoices/inv_00011.pdf` and `inv_00012.pdf` (seed 1) fail PDF/A-3b on the same two rules, ISO 19005-3 §6.2.11.4.1 (Helvetica and Helvetica-Bold are not embedded) and §6.2.4.3 (DeviceGray without an output intent). The XML of inv_00012 is valid; the XML of inv_00011 fails only on its injected `vat_sum_off`. Mustang exits 0 for inv_00012 although its PDF is invalid, so a check must read the report, not the exit code. The owner accepted this as a limitation on 2026-11-03 and the README Limitations names it; generate.py is unchanged. A9 closes the line by making the generator write PDF/A-3 (embedded fonts, an output intent) or by keeping the README sentence.
 - [open: A5] `extraction/prompts/extract_de.txt`: never sent to a real model; whether it yields valid JSON with exact quotes (and no code fences) is unknown. Replay fixtures are hand-written, not recorded.
-- [open: A4] `ml/coding.py::E5Encoder`: `SentenceTransformer("intfloat/multilingual-e5-small").encode(..., normalize_embeddings=True)` never ran here (no HuggingFace access, sentence-transformers not installed); the "query: " prefix is from the model card. Run `einvoice train` with the real model.
-- [open: A4] `ml/train.py`: MLflow runs, registry and alias were checked only against a local SQLite store; the Compose MLflow service and `load_champion` from it are untested.
-- [open: A4] `einvoice eval` without `--fixtures`: never called the live KoSIT daemon; `reports/metrics.json` and `risk_coverage.png` with live validation do not exist yet.
-- [open: A4] `einvoice convert`: the written CII never went through the live KoSIT daemon.
 - [open: A5] `evaluate.run_gold`: PDFs and scans are skipped until replay responses exist under `<dir>/replay/`; scans also need tesseract.
 
 - [open: A5] `llm.py`: the `ollama`, `openai` (Gemini through `OPENAI_BASE_URL`) and `anthropic` branches never reached a provider [cloud-built]; tool calling and the JSON answer format are unchecked. The provider probe decides the model.

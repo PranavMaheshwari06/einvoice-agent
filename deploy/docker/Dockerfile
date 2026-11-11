@@ -18,5 +18,6 @@ COPY src src
 RUN pip install --no-cache-dir --no-deps -e .
 
 ENV HF_HOME=/home/dev/.cache/huggingface
-RUN mkdir -p $HF_HOME && chown -R dev:dev /home/dev/.cache
+# The mlflow service mounts its volume at /home/dev/mlflow; a volume over a missing path is root-owned.
+RUN mkdir -p $HF_HOME /home/dev/mlflow && chown -R dev:dev /home/dev/.cache /home/dev/mlflow
 USER dev

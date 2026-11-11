@@ -1,4 +1,4 @@
-COMPOSE = docker compose -f deploy/compose.yaml --profile core
+COMPOSE = docker compose -f deploy/compose.yaml --profile core --profile ml
 
 .PHONY: lint test check test-integration fetch up down lock
 

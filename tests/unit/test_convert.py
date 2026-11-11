@@ -1,10 +1,13 @@
 import pytest
 
 from conftest import FIXTURES
+from einvoice.config import get_settings
 from einvoice.convert import PEPPOL_BILLING_PROCESS, invoice_to_cii, to_xrechnung
 from einvoice.models import ValidationResult
 from einvoice.parsing.cii import NS, parse_cii
+from einvoice.parsing.ubl import parse_ubl
 from einvoice.parsing.xmltools import parse_xml
+from einvoice.validation.kosit import validate
 
 
 def test_cii_invoice_survives_a_round_trip():
@@ -53,3 +56,12 @@ def test_cii_names_the_business_process():
         namespaces=NS,
     )
     assert ids == [PEPPOL_BILLING_PROCESS]
+
+
+@pytest.mark.integration
+def test_live_validator_accepts_a_ubl_invoice_written_as_cii():
+    invoice = parse_ubl((FIXTURES / "xrechnung" / "01.01a-INVOICE_ubl.xml").read_bytes())
+    url = get_settings().validator_url
+    xml, result = to_xrechnung(invoice, lambda content: validate(content, url))
+    assert result.accepted, result.errors
+    assert parse_cii(xml).number.value == invoice.number.value
