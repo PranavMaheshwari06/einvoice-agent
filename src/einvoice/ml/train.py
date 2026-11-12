@@ -7,13 +7,11 @@ from pathlib import Path
 
 import mlflow
 import numpy as np
-from sklearn.base import ClassifierMixin, clone
+from sklearn.base import ClassifierMixin
 from sklearn.metrics import accuracy_score, f1_score
 
 from einvoice.ml.coding import (
-    CALIBRATION_FOLDS,
     Encoder,
-    calibrate,
     coverage_at_precision,
     embedding_model,
     expected_calibration_error,
@@ -74,12 +72,13 @@ def pick_champion(validation_scores: dict[str, dict[str, float]]) -> str:
 
 
 def _fit(name: str, model, train: Lines, validation: Lines, test: Lines) -> dict:
-    calibrated = calibrate(model, train.texts, train.accounts, train.sellers)
-    raw = clone(model).fit(train.texts, train.accounts)
-    scores = {"validation": score(calibrated, validation), "test": score(calibrated, test)}
-    scores["validation"]["ece_uncalibrated"] = score(raw, validation)["ece"]
+    # Raw probabilities, no calibration step: on seed 1 isotonic calibration cut coverage at
+    # 98 % precision about tenfold (STATE.md, A4 live findings); the gate threshold is chosen
+    # on validation anyway, so the ranking is what counts.
+    fitted = model.fit(train.texts, train.accounts)
+    scores = {"validation": score(fitted, validation), "test": score(fitted, test)}
     logger.info("%s: validation %s", name, scores["validation"])
-    return {"model": calibrated, "scores": scores}
+    return {"model": fitted, "scores": scores}
 
 
 def train(
@@ -104,13 +103,13 @@ def train(
                 {
                     "model": name,
                     "encoder": encoder_name if name == "embeddings" else "tfidf",
-                    "calibration": f"isotonic, GroupKFold({CALIBRATION_FOLDS}) by seller",
+                    "calibration": "none",
                     "train_lines": len(train_lines.texts),
                 }
             )
             for split, split_scores in result["scores"].items():
                 mlflow.log_metrics({f"{split}_{key}": value for key, value in split_scores.items()})
-            # skops (the default) refuses the calibrated wrapper and the injected encoder.
+            # skops (the default) refuses the injected encoder.
             info = mlflow.sklearn.log_model(
                 result["model"], name="model", serialization_format="cloudpickle"
             )

@@ -2,7 +2,7 @@
   "name": "einvoice-agent",
   "dockerComposeFile": "../deploy/compose.yaml",
   "service": "dev",
-  "runServices": ["dev", "postgres", "validator"],
+  "runServices": ["dev", "postgres", "validator", "mlflow"],
   "workspaceFolder": "/workspace",
   "remoteUser": "dev",
   "customizations": {

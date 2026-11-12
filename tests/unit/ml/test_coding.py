@@ -2,12 +2,10 @@ import pickle
 
 import numpy as np
 import pytest
-from sklearn.base import clone
 
 from conftest import stub_encode, xml_value
 from einvoice.ml.coding import (
     E5Encoder,
-    calibrate,
     coverage_at_precision,
     embedding_model,
     expected_calibration_error,
@@ -23,7 +21,6 @@ TEXTS = [
     for item in ("Druckerpapier A4", "Toner schwarz", "Bürostuhl", "Webhosting")
 ]
 ACCOUNTS = ["4930", "4930", "0420", "4980"] * 6
-SELLERS = [text.split(" | ")[1] for text in TEXTS]
 
 
 def test_ece_is_zero_when_confidence_matches_accuracy():
@@ -51,15 +48,15 @@ def test_coverage_cannot_split_equal_confidences():
 
 
 @pytest.mark.parametrize("model", [tfidf_model(), embedding_model(stub_encode)])
-def test_calibrated_models_return_probabilities(model):
-    calibrated = calibrate(model, TEXTS, ACCOUNTS, SELLERS)
-    probabilities = calibrated.predict_proba([line_text("Toner schwarz", "Neu GmbH")])
+def test_models_return_probabilities(model):
+    fitted = model.fit(TEXTS, ACCOUNTS)
+    probabilities = fitted.predict_proba([line_text("Toner schwarz", "Neu GmbH")])
     assert np.all((probabilities >= 0) & (probabilities <= 1))
     assert probabilities.sum() == pytest.approx(1.0)
 
 
 def test_suggestion_uses_the_largest_line():
-    calibrated = calibrate(tfidf_model(), TEXTS, ACCOUNTS, SELLERS)
+    fitted = tfidf_model().fit(TEXTS, ACCOUNTS)
     invoice = Invoice(
         format="ubl",
         seller_name=xml_value("Neu GmbH"),
@@ -68,15 +65,15 @@ def test_suggestion_uses_the_largest_line():
             LineItem(item_name=xml_value("Bürostuhl"), net_amount=xml_value(400)),
         ],
     )
-    account, probability = suggest_account(calibrated, invoice)
+    account, probability = suggest_account(fitted, invoice)
     assert account == "0420"
     assert 0 <= probability <= 1
 
 
 def test_no_suggestion_without_a_named_line():
-    calibrated = calibrate(tfidf_model(), TEXTS, ACCOUNTS, SELLERS)
+    fitted = tfidf_model().fit(TEXTS, ACCOUNTS)
     invoice = Invoice(format="pdf", seller_name=xml_value("Neu GmbH"), lines=[LineItem()])
-    assert suggest_account(calibrated, invoice) is None
+    assert suggest_account(fitted, invoice) is None
 
 
 class RecordingModel:
@@ -112,11 +109,10 @@ def test_e5_encoder_pickles_without_the_loaded_model():
     assert restored._prefix == "passage: "
 
 
-def test_e5_encoder_encodes_each_text_once_across_fold_copies():
+def test_e5_encoder_encodes_each_text_once():
     encoder = E5Encoder()
     encoder._model = RecordingModel()
-    pipeline = clone(embedding_model(encoder))
-    pipeline.steps[0][1].kw_args["encode"](["a", "b", "a"])
+    encoder(["a", "b", "a"])
     vectors = encoder(["b", "a"])
     assert encoder._model.calls == [(["query: a", "query: b"], True)]
     assert vectors.shape == (2, 3)

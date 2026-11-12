@@ -52,7 +52,7 @@ file ──> detect ──┬─ XML (UBL/CII) ──────────┐
                      rules engine: §14 fields, arithmetic, USt-IdNr, duplicates,
                      PO / goods-receipt match, bank-detail change      ─────┤
                                                                             │
-                     GL-account suggestion (SKR03, calibrated) ─────────────┤
+                     GL-account suggestion (SKR03, with probability) ───────┤
                                                                             v
                                   decision: AUTO_BOOK | REVIEW(reasons)
                                                                             │
@@ -127,7 +127,10 @@ them in a fixed list and builds the `Decision`.
 - Features: line item text + seller name (+ seller's most frequent past account).
 - Baseline: TF-IDF (word + char n-grams) + logistic regression.
 - Second model: sentence embeddings (`intfloat/multilingual-e5-small`) + logistic regression.
-- Both calibrated (`CalibratedClassifierCV`, isotonic) so the probability can gate AUTO_BOOK.
+- No calibration step: the logistic regression's own top probability gates AUTO_BOOK, with the
+  threshold chosen on validation by `evaluate.py`. ECE is measured and reported. (Isotonic
+  calibration was specified until A4 live; on seed 1 it cut coverage at 98% precision about
+  tenfold, see STATE.md, decision log 2026-11-12.)
 - Grouped split by seller, so the test set contains unseen sellers (avoids leakage).
 - MLflow: log params, macro-F1, accuracy, expected calibration error, coverage at 98% precision;
   register the better model as `gl-coder`, alias `champion`.

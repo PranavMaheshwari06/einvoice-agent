@@ -1,0 +1,40 @@
+{
+ "encoder": "intfloat/multilingual-e5-small",
+ "champion": "tfidf",
+ "chosen_on": "validation macro_f1",
+ "lines": {
+  "validation": 595,
+  "train": 2532,
+  "test": 1006
+ },
+ "models": {
+  "tfidf": {
+   "validation": {
+    "macro_f1": 0.7816650506275319,
+    "accuracy": 0.8201680672268907,
+    "ece": 0.07195940675503255,
+    "coverage_at_98_precision": 0.43025210084033616
+   },
+   "test": {
+    "macro_f1": 0.8217698347104895,
+    "accuracy": 0.8280318091451292,
+    "ece": 0.13442929212497143,
+    "coverage_at_98_precision": 0.3757455268389662
+   }
+  },
+  "embeddings": {
+   "validation": {
+    "macro_f1": 0.7717431281488283,
+    "accuracy": 0.8,
+    "ece": 0.30714593564762793,
+    "coverage_at_98_precision": 0.4672268907563025
+   },
+   "test": {
+    "macro_f1": 0.7988490383534066,
+    "accuracy": 0.8180914512922465,
+    "ece": 0.3802581932803034,
+    "coverage_at_98_precision": 0.33399602385685884
+   }
+  }
+ }
+}

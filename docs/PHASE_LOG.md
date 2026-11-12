@@ -108,3 +108,26 @@ into the branch. `/simplify` made `render.py` take its KoSIT constants from `con
 let two tests reuse `read_structured` and `db.connect`. `/code-review` raised nine points; one
 (this entry) was applied, the others were owner decisions or theoretical. Result: ruff clean,
 344 passed, 6 integration passed. Next: A4 live on `pranav/a4-live`, started from `main`.
+
+## L1, A4 live (2026-11-12)
+
+Added the `mlflow` service (Compose profile `ml`, same image as dev, SQLite and artifacts on a
+volume, localhost port, `--allowed-hosts` because MLflow 3.17 rejects unknown Host headers).
+`einvoice train` ran with the real e5 model and registered `gl-coder@champion` on it;
+`einvoice eval` loaded the champion from it and validated every structured invoice with the
+live KoSIT daemon; `einvoice convert` output is accepted by KoSIT, now pinned by an integration
+test. Leakage checks before writing numbers: no seller in two splits, thresholds chosen on
+validation only, worst errors read. With isotonic calibration as specified the pipeline booked
+4 % of the test invoices; a line-level comparison showed that isotonic cut TF-IDF coverage at
+98 % precision from 0.43 to 0.05 and that top-label isotonic on out-of-fold scores had the best
+ECE but only four score levels. The owner chose raw scores without calibration; `calibrate()`
+is removed and SPEC 3.6 changed. Result in `reports/metrics.json`: on test 66 of 334 structured
+invoices booked automatically, 0 wrong, 95 % upper bound on risk 0.045; the rules sent every
+must-review invoice to review, so the limit is the GL account of unseen sellers. PDFs and scans
+are not counted until A5 records extraction replies. The isotonic comparison numbers come from
+a throwaway script and are not in `reports/`. Registry: `gl-coder` v2 (raw scores) holds the
+`champion` alias; v1 (isotonic) stays as history. `/simplify` removed `E5Encoder.__deepcopy__`,
+which only let the calibration folds share one encoder, and the stale fold wording in the design
+note; its test keeps the one-encode-per-text assertion without the fold simulation.
+`/code-review` found no correctness defect in the diff. Result: ruff clean, 344 passed, 7
+integration passed. Next: the docs-only SPEC hardening PR, then A5 live.
